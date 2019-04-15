@@ -1,0 +1,79 @@
+<?php
+
+/**
+ * @file
+ * Install/Update/Uninstall for Stanford RSVP module
+ *
+ */
+
+
+/**
+ * Implements hook_install().
+ *
+ */
+
+function stanford_rsvp_install()
+{
+}
+
+/**
+ * Implements hook_schema().
+ *
+ */
+
+function stanford_rsvp_schema()
+{
+    $schema = array();
+
+    $schema['stanford_rsvp_rsvps'] = array(
+    'description' => 'RSVPs by users.',
+    'fields' => array(
+      'id' => array(
+        'description' => 'The primary identifier or id.',
+        'type' => 'serial',
+        'unsigned' => true,
+        'not null' => true,
+      ),
+      'eid' => array(
+        'description' => 'The RSVP event id.',
+        'type' => 'int',
+        'unsigned' => true,
+        'not null' => true,
+        'default' => 0,
+      ),
+      'did' => array(
+        'description' => 'The RSVP date id.',
+        'type' => 'int',
+        'unsigned' => true,
+        'not null' => true,
+        'default' => 0,
+      ),
+      'oid' => array(
+        'description' => 'The RSVP option id.',
+        'type' => 'int',
+        'unsigned' => true,
+        'not null' => true,
+        'default' => 0,
+      ),
+      'uid' => array(
+        'description' => 'The {users}.uid that submitted the RSVP.',
+        'type' => 'int',
+        'unsigned' => true,
+        'not null' => true,
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the RSVP was submitted.',
+        'type' => 'int',
+        'not null' => true,
+        'default' => 0),
+    ),
+    'indexes' => array(
+      'oid' => array('oid'),
+      'uid' => array('uid'),
+      'did' => array('did'),
+    ),
+    'primary key' => array('id'),
+  );
+
+    return $schema;
+}
