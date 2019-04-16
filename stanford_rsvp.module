@@ -1,0 +1,141 @@
+<?php
+
+/**
+ * Implementation of hook_block_info()
+ * This module creates one block to display RSVP options
+ */
+
+function stanford_rsvp_block_info() {
+
+	$blocks = array();
+
+  # Retrieve a list of active events
+  $events = db_query("select n.nid, n.title, fdfd.field_dates_value, fdfdn.field_date_name_value from field_data_field_dates as fdfd left join node as n on (n.nid = fdfd.entity_id) left join field_data_field_date_name as fdfdn on (fdfd.field_dates_value = fdfdn.entity_id) where n.status = 1 and n.type = 'event';")->fetchAll();
+
+  foreach ($events as $event) {
+    $blocks['stanford_rsvp_' . $event->nid . '_' . $event->field_dates_value] = array(
+      'info'  => t('Stanford RSVP - ' . $event->title . ' - ' . $event->field_date_name_value),
+      'cache' => DRUPAL_NO_CACHE,
+    );
+  }
+
+  return $blocks;
+}
+
+
+/**
+ * Implementation of hook_block_view().
+ * @param string $delta code to identify the block
+*/
+
+function stanford_rsvp_block_view($delta = '') {
+
+  // set up an empty array which will contain the block contents
+  $block = array();
+
+  if (preg_match('/stanford_rsvp_/', $delta)) {
+    $event_date_id = substr($delta, strlen('stanford_rsvp_'));
+		list($event_id, $date_id) = explode('_', $event_date_id);
+
+    if (stanford_rsvp_event_active($event_id)) {
+      $block_content = '';
+			$block_content = $event_id . ' - ' . $date_id;
+      global $user;
+      $block['subject'] = t('RSVP');
+
+      // if the user is logged in, we check their registration status
+      if ($user->uid > 0) {
+        $block_content .= "<p>Hello " . $user->name . "!</p>";
+        $rsvp = stanford_rsvp_user_rsvp($user->uid, $event_id, $date_id);
+
+        if ($rsvp) { $block_content .= "<p>Your current RSVP is:<br /><strong>" . stanford_rsvp_option_name($rsvp) . "</strong></p>";
+          	$rsvp_form = drupal_get_form('stanford_rsvp_rsvp_form', $event_id, $date_id);
+          	$block_content .= drupal_render($rsvp_form);
+        } else {
+        	$block_content .= "<p>You haven&rsquo;t RSVP&rsquo;ed yet.</p>";
+          	$rsvp_form = drupal_get_form('stanford_rsvp_rsvp_form', $event_id, $date_id);
+          	$block_content .= drupal_render($rsvp_form);
+        }
+      }
+      // if the user is anonymous, we'll ask them to log in before they can register.
+      else {
+	    $block_content .= '<p>' . t('Please log in to register.') . '</p>';
+        $block_content .= l(
+          'Log in',
+          variable_get('stanford_rsvp_login_url', 'user/login'),
+          array(
+            'attributes' => array('class' => array('btn success')),
+            'query'      => array(drupal_get_destination())
+          )
+        );
+      }
+      $block['content'] = $block_content;
+    }
+  }
+  return $block;
+}
+
+/**
+ *  Find the active status of an event
+ */
+
+function stanford_rsvp_event_active($id) {
+  $active = db_query('SELECT status FROM {node} WHERE nid = :nid', array(':nid' => $id))->fetchField();
+  return $active;
+}
+
+/**
+ * Find the user's current RSVP status
+ */
+
+function stanford_rsvp_user_rsvp($uid, $eid, $did) {
+  $rsvp_id = db_query('SELECT oid FROM {stanford_rsvp_rsvps} WHERE uid = :uid and eid = :eid and did = :did', array(':uid' => $uid, ':eid' => $eid, ':did' => $did))->fetchField();
+  return $rsvp_id;
+}
+
+/**
+ *  Find the RSVP option's name
+ */
+function stanford_rsvp_option_name($id) {
+  $rsvp_name = db_query('SELECT fdftn.field_ticket_name_value from {field_data_field_tickets} as fdft join {field_data_field_ticket_name} as fdftn on (fdft.field_tickets_value = fdftn.entity_id) where fdft.field_tickets_value = :id', array(':id' => $id))->fetchField();
+  return $rsvp_name;
+}
+
+/**
+ * RSVP Form
+ */
+
+function stanford_rsvp_rsvp_form($form, $form_state, $event_id, $date_id) {
+  global $user;
+	/*
+  $rsvp_options = db_query("SELECT id, name FROM {simple_rsvp_rt_options} where active = 1 and eid = :eid order by weight", array(':eid' => $event_id))->fetchAllKeyed();
+
+  // check if the options have space available, and if not, note they are full
+  foreach ($rsvp_options as $option_id => $option_name) {
+    if (!(simple_rsvp_rt_spaces_available($option_id, $event_id))) {
+      $rsvp_options[$option_id] = $option_name . ' - FULL';
+    }
+  }
+
+  $option_value = simple_rsvp_rt_user_rsvp($user->uid, $event_id);
+
+  $form['rsvp_options_' . $event_id] = array(
+  	'#required' => true,
+    '#type' => 'select',
+    '#multiple' => false,
+    '#options' => $rsvp_options,
+    '#default_value' => $option_value,
+    '#empty_option' => ' Please select',
+  );
+  $form['event_id'] = array(
+    '#type' => 'hidden',
+    '#value' => $event_id,
+  );
+  $form['submit'] = array(
+    '#attributes' => array('class' => array('btn')),
+    '#type' => 'submit',
+    '#value' => t('RSVP')
+  );
+  return $form;
+*/
+}
