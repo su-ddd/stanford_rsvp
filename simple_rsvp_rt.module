@@ -1,0 +1,288 @@
+<?php
+
+/**
+ * Implementation of hook_block_info()
+ * This module creates one block to display RSVP options
+ */
+
+function simple_rsvp_rt_block_info() {
+  # Retrieve a list of active events
+  $events = db_query("SELECT id, name FROM {simple_rsvp_rt_events} where active = 1")->fetchAllKeyed();
+
+  foreach ($events as $event_id => $event_name) {
+    $blocks['simple_rsvp_rt_' . $event_id] = array(
+      'info'  => t('Simple RSVP - ' . $event_name),
+      'cache' => DRUPAL_NO_CACHE, 
+    );
+  }
+  return $blocks;
+}
+
+/**
+ * Implementation of hook_block_view().
+ * @param string $delta code to identify the block
+*/
+
+function simple_rsvp_rt_block_view($delta = '') {
+
+  // set up an empty array which will contain the block contents
+  $block = array();
+
+  if (preg_match('/simple_rsvp_rt_/', $delta)) {
+    $event_id = substr($delta, strlen('simple_rsvp_rt_'));
+    if (simple_rsvp_rt_event_active($event_id)) {
+      $block_content = '';
+      global $user;
+      $block['subject'] = t('RSVP');
+
+      // if the user is logged in, we check their registration status
+      if ($user->uid > 0) {
+        $block_content .= "<p>Hello " . $user->name . "!</p>";
+        $rsvp = simple_rsvp_rt_user_rsvp($user->uid, $event_id);
+
+        if ($rsvp) { $block_content .= "<p>Your current RSVP is:<br /><strong>" . simple_rsvp_rt_option_name($rsvp) . "</strong></p>";
+          	$rsvp_form = drupal_get_form('simple_rsvp_rt_rsvp_form', $event_id);
+          	$block_content .= drupal_render($rsvp_form);
+        } else {
+        	$block_content .= "<p>You haven&rsquo;t RSVP&rsquo;ed yet.</p>";
+          	$rsvp_form = drupal_get_form('simple_rsvp_rt_rsvp_form', $event_id);
+          	$block_content .= drupal_render($rsvp_form);
+        }
+      }
+      // if the user is anonymous, we'll ask them to log in before they can register.
+      else {
+	    $block_content .= '<p>' . t('Please log in to register.') . '</p>';
+        $block_content .= l(
+          'Log in',
+          variable_get('simple_registration_login_url', 'user/login'),
+          array(
+            'attributes' => array('class' => array('btn success')),
+            'query'      => array(drupal_get_destination())
+          )
+        );
+      }
+      $block['content'] = $block_content;
+    }
+  }
+  return $block;
+}
+
+
+/**
+ * Find the user's current RSVP status
+ */
+
+function simple_rsvp_rt_user_rsvp($uid, $eid) {
+  $rsvp_id = db_query('SELECT oid FROM {simple_rsvp_rt_rsvps} WHERE uid = :uid and eid = :eid', array(':uid' => $uid, ':eid' => $eid))->fetchField();
+  return $rsvp_id;
+}
+
+/**
+ *  Find the RSVP option's name
+ */
+function simple_rsvp_rt_option_name($id) {
+  $rsvp_name = db_query('SELECT name FROM {simple_rsvp_rt_options} WHERE id = :id', array(':id' => $id))->fetchField();
+  return $rsvp_name;
+}
+
+/**
+ *  Find if an RSVP option is the cancel option (as in "I won't attend")
+ */
+function simple_rsvp_rt_option_cancel($id) {
+  $rsvp_cancel = db_query('SELECT cancel FROM {simple_rsvp_rt_options} WHERE id = :id', array(':id' => $id))->fetchField();
+  return $rsvp_cancel;
+}
+
+/**
+ *  Find the active status of an event
+ */
+function simple_rsvp_rt_event_active($id) {
+  $active = db_query('SELECT active FROM {simple_rsvp_rt_events} WHERE id = :id', array(':id' => $id))->fetchField();
+  return $active;
+}
+
+/**
+ * RSVP Form
+ */
+
+function simple_rsvp_rt_rsvp_form($form, $form_state, $event_id) {
+  global $user;
+  $rsvp_options = db_query("SELECT id, name FROM {simple_rsvp_rt_options} where active = 1 and eid = :eid order by weight", array(':eid' => $event_id))->fetchAllKeyed();
+
+  // check if the options have space available, and if not, note they are full
+  foreach ($rsvp_options as $option_id => $option_name) {
+    if (!(simple_rsvp_rt_spaces_available($option_id, $event_id))) {
+      $rsvp_options[$option_id] = $option_name . ' - FULL';
+    }
+  }
+
+  $option_value = simple_rsvp_rt_user_rsvp($user->uid, $event_id);
+
+  $form['rsvp_options_' . $event_id] = array(
+  	'#required' => true,
+    '#type' => 'select',
+    '#multiple' => false,
+    '#options' => $rsvp_options,
+    '#default_value' => $option_value,
+    '#empty_option' => ' Please select',
+  );
+  $form['event_id'] = array(
+    '#type' => 'hidden',
+    '#value' => $event_id,
+  );
+  $form['submit'] = array(
+    '#attributes' => array('class' => array('btn')),
+    '#type' => 'submit',
+    '#value' => t('RSVP')
+  );
+  return $form;
+}
+
+function simple_rsvp_rt_spaces_available($option_id, $event_id) {
+
+  if (simple_rsvp_rt_option_cancel($option_id)) {
+    return true;
+  }
+
+  if (!(simple_rsvp_rt_event_spaces_available($event_id))) {
+    return false;
+  }
+
+  // get the maximum number of rsvps
+  $max_rsvps = db_query('SELECT max_rsvps FROM {simple_rsvp_rt_options} WHERE id = :id and eid = :eid', array(':id' => $option_id, ':eid' => $event_id))->fetchField();
+
+  // if the value is null, there is no limit
+  if ($max_rsvps == null) {
+    return true;
+  }
+
+  // get the current number of rsvps
+  $current_rsvps = db_query('SELECT count(1) FROM {simple_rsvp_rt_rsvps} WHERE oid = :oid', array(':oid' => $option_id))->fetchField();
+
+  if ($max_rsvps > $current_rsvps) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+function simple_rsvp_rt_event_spaces_available($event_id) {
+  global $user;
+
+  $max_rsvps_per_event = db_query('SELECT max_rsvps FROM {simple_rsvp_rt_events} WHERE id = :id', array(':id' => $event_id))->fetchField();
+  // Get all options for this event
+  $rsvp_options = db_query("SELECT id FROM {simple_rsvp_rt_options} where active = 1 and eid = :eid and cancel = 0 order by weight", array(':eid' => $event_id))->fetchAll();
+
+  $total_rsvps = 0;
+  
+  // count the total RSVPs for all options
+  foreach ($rsvp_options as $option) {
+    $option_rsvps = db_query('SELECT count(1) FROM {simple_rsvp_rt_rsvps} WHERE oid = :oid', array(':oid' => $option->id))->fetchField();
+    $total_rsvps += $option_rsvps;
+  }
+
+  // Don't count the RSVP for this user, if they are registered
+  // That way, they can change from one RSVP to another
+  $option_id = simple_rsvp_rt_user_rsvp($user->uid, $event_id);
+  if ($option_id) {
+    if (!(simple_rsvp_rt_option_cancel($option_id))) {
+      $total_rsvps--;
+    }
+  }
+
+  if ($max_rsvps_per_event > $total_rsvps) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+function simple_rsvp_rt_rsvp_form_validate($form, &$form_state) {
+  $event_id  = $form_state['values']['event_id'];
+  $option_id = $form_state['values']['rsvp_options_' . $event_id];
+
+  // check if there are any spaces available
+  if (!(simple_rsvp_rt_spaces_available($option_id, $event_id))) {
+    // if not, before we mark this as an error
+    // let's see if the user is already RSVP'ed for this option
+    global $user;
+    $current_option_id = simple_rsvp_rt_user_rsvp($user->uid, $event_id);
+    if (!(isset($current_option_id)) || ($current_option_id != $option_id)) {
+      form_set_error('rsvp_options_' . $event_id, t('Please choose a valid option.'));
+    }
+  }
+} 
+
+function simple_rsvp_rt_rsvp_form_submit($form, &$form_state) {
+  global $user;
+  $event_id = $form_state['values']['event_id'];
+  simple_rsvp_rt_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $event_id], $form_state['values']['event_id']);
+}
+
+function simple_rsvp_rt_update_rsvp($uid, $rsvp_option, $event_id) {
+  $user = user_load($uid);
+
+  // Log the registration
+//  watchdog('simple_registration','Registered: %user', array('%user' => $user->name));
+  
+  // Create or update the user's status
+  db_merge('simple_rsvp_rt_rsvps')
+    ->key(array('uid' => $uid, 'eid' => $event_id))
+    ->fields(array(
+      'oid' => $rsvp_option,
+      'created' => REQUEST_TIME,
+    ))
+    ->execute();
+
+  rules_invoke_event('simple_rsvp_rt_update', $user);
+  if (($rsvp_option == 1) || ($rsvp_option == 2)) {
+#    simple_rsvp_rt_call_webhook($rsvp_option);
+  }
+}
+
+/**
+* Implements hook_views_api().
+*/
+function simple_rsvp_rt_views_api() {
+  return array(
+    'api' => 3,
+    'path' => drupal_get_path('module', 'simple_rsvp_rt') . '/views',
+  );
+}
+
+/**
+ * Implementation of hook_rules_event_info().
+ * @ingroup rules
+ */
+function simple_rsvp_rt_rules_event_info() {
+  return array(
+    'simple_rsvp_rt_rsvp' => array(
+      'label' => t('User updates RSVP'),
+      'module' => 'simple_rsvp_rt',
+      'arguments' => array(
+        'simple_rsvp_rt_user' => array('type' => 'user', 'label' => t('The user RSVPing')),
+      ),
+    ),
+  );
+}
+
+function simple_rsvp_rt_call_webhook($rsvp) {
+  return;
+  global $user;
+  if (($rsvp == 1) || ($rsvp == 2)) {
+      $headers = array(
+        'Content-Type' => 'application/json',
+      );
+    if ($rsvp == 1) {
+      #$webhook = 'https://hooks.zapier.com/hooks/catch/3078895/kze2fg/';
+      $webhook = 'https://hooks.zapier.com/hooks/catch/3078895/kqbnn3/';
+      $payload = [ 'email' => $user->mail, 'rsvp' => 'In Person', 'date' => REQUEST_TIME, ];
+    } else {
+      #$webhook = 'https://hooks.zapier.com/hooks/catch/3078895/kk9e68/';
+      $webhook = 'https://hooks.zapier.com/hooks/catch/3078895/kq59f6/';
+      $payload = [ 'email' => $user->mail, 'rsvp' => 'Zoom', 'date' => REQUEST_TIME, ];
+    }
+    $json = json_encode($payload);
+    drupal_http_request($webhook, array('data' => $json, 'method' => 'POST', 'headers' => $headers));
+  }
+}
