@@ -35,18 +35,18 @@ function stanford_rsvp_block_view($delta = '') {
 
   if (preg_match('/stanford_rsvp_/', $delta)) {
     $event_date_id = substr($delta, strlen('stanford_rsvp_'));
-		list($event_id, $date_id) = explode('_', $event_date_id);
+    list($event_id, $date_id) = explode('_', $event_date_id);
 
     if (stanford_rsvp_event_active($event_id)) {
       $block_content = '';
-			$block_content = $event_id . ' - ' . $date_id;
+      $block_content = $event_id . ' - ' . $date_id;
       global $user;
       $block['subject'] = t('RSVP');
 
       // if the user is logged in, we check their registration status
       if ($user->uid > 0) {
         $block_content .= "<p>Hello " . $user->name . "!</p>";
-        $rsvp = stanford_rsvp_user_rsvp($user->uid, $event_id, $date_id);
+        $rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
 
         if ($rsvp) { $block_content .= "<p>Your current RSVP is:<br /><strong>" . stanford_rsvp_option_name($rsvp) . "</strong></p>";
           	$rsvp_form = drupal_get_form('stanford_rsvp_rsvp_form', $event_id, $date_id);
@@ -88,8 +88,8 @@ function stanford_rsvp_event_active($id) {
  * Find the user's current RSVP status
  */
 
-function stanford_rsvp_user_rsvp($uid, $eid, $did) {
-  $rsvp_id = db_query('SELECT oid FROM {stanford_rsvp_rsvps} WHERE uid = :uid and eid = :eid and did = :did', array(':uid' => $uid, ':eid' => $eid, ':did' => $did))->fetchField();
+function stanford_rsvp_user_rsvp($uid, $did) {
+  $rsvp_id = db_query('SELECT oid FROM {stanford_rsvp_rsvps} WHERE uid = :uid and did = :did', array(':uid' => $uid, ':did' => $did))->fetchField();
   return $rsvp_id;
 }
 
@@ -107,19 +107,18 @@ function stanford_rsvp_option_name($id) {
 
 function stanford_rsvp_rsvp_form($form, $form_state, $event_id, $date_id) {
   global $user;
-	/*
-  $rsvp_options = db_query("SELECT id, name FROM {simple_rsvp_rt_options} where active = 1 and eid = :eid order by weight", array(':eid' => $event_id))->fetchAllKeyed();
+  $rsvp_options = stanford_rsvp_get_options($date_id);
 
   // check if the options have space available, and if not, note they are full
   foreach ($rsvp_options as $option_id => $option_name) {
-    if (!(simple_rsvp_rt_spaces_available($option_id, $event_id))) {
+    if (!(stanford_rsvp_spaces_available($option_id, $date_id))) {
       $rsvp_options[$option_id] = $option_name . ' - FULL';
     }
   }
 
-  $option_value = simple_rsvp_rt_user_rsvp($user->uid, $event_id);
+  $option_value = stanford_rsvp_user_rsvp($user->uid, $date_id);
 
-  $form['rsvp_options_' . $event_id] = array(
+  $form['rsvp_options_' . $date_id] = array(
   	'#required' => true,
     '#type' => 'select',
     '#multiple' => false,
@@ -131,11 +130,127 @@ function stanford_rsvp_rsvp_form($form, $form_state, $event_id, $date_id) {
     '#type' => 'hidden',
     '#value' => $event_id,
   );
+  $form['date_id'] = array(
+    '#type' => 'hidden',
+    '#value' => $date_id,
+  );
   $form['submit'] = array(
     '#attributes' => array('class' => array('btn')),
     '#type' => 'submit',
     '#value' => t('RSVP')
   );
   return $form;
+}
+
+function stanford_rsvp_get_options($date_id) {
+  $rsvp_options = db_query("select fdft.field_tickets_value as id, fdftn.field_ticket_name_value as name from {field_data_field_tickets} as fdft join {field_data_field_ticket_name} as fdftn on fdft.field_tickets_value = fdftn.entity_id and fdft.bundle = 'date' and fdft.entity_id = :date_id order by fdft.delta ASC", array(':date_id' => $date_id))->fetchAllKeyed();
+  return $rsvp_options;
+}
+
+function stanford_rsvp_spaces_available($option_id, $date_id) {
+
+/*
+  if (stanford_rsvp_option_cancel($option_id)) {
+    return true;
+  }
 */
+
+  if (!(stanford_rsvp_date_spaces_available($date_id))) {
+    return false;
+  }
+
+  // get the maximum number of rsvps
+//  $max_rsvps = db_query('SELECT max_rsvps FROM {simple_rsvp_rt_options} WHERE id = :id and eid = :eid', array(':id' => $option_id, ':eid' => $event_id))->fetchField();
+  $max_rsvps = db_query('SELECT field_ticket_max_attendees_value from {field_data_field_ticket_max_attendees} where entity_id = :id', array(':id' => $option_id))->fetchField();
+
+  // if the value is null, there is no limit
+  if ($max_rsvps == null) {
+    return true;
+  }
+
+  // get the current number of rsvps
+  $current_rsvps = db_query('SELECT count(1) FROM {stanford_rsvp_rsvps} WHERE oid = :oid', array(':oid' => $option_id))->fetchField();
+
+  if ($max_rsvps > $current_rsvps) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+function stanford_rsvp_date_spaces_available($date_id) {
+  global $user;
+
+  $max_rsvps_per_date = db_query('select field_date_max_attendees_value from {field_data_field_date_max_attendees} where entity_id = :id', array(':id' => $date_id))->fetchField();
+
+  if (!$max_rsvps_per_date) {
+    $max_rsvps_per_date = 0;
+  }
+  // Get all options for this event
+  $rsvp_options = stanford_rsvp_get_options($date_id);
+
+  //db_query("SELECT id FROM {simple_rsvp_rt_options} where active = 1 and eid = :eid and cancel = 0 order by weight", array(':eid' => $event_id))->fetchAll();
+
+  $total_rsvps = 0;
+  
+  // count the total RSVPs for all options
+  foreach (array_keys($rsvp_options) as $option) {
+    $option_rsvps = db_query('SELECT count(1) FROM {stanford_rsvp_rsvps} WHERE oid = :oid', array(':oid' => $option))->fetchField();
+    $total_rsvps += $option_rsvps;
+  }
+
+  // Don't count the RSVP for this user, if they are registered
+  // That way, they can change from one RSVP to another
+  $option_id = stanford_rsvp_user_rsvp($user->uid, $date_id);
+  if ($option_id) {
+//    if (!(simple_rsvp_rt_option_cancel($option_id))) {
+      $total_rsvps--;
+//    }
+  }
+
+  if (($max_rsvps_per_date == 0) || ($max_rsvps_per_date > $total_rsvps)) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+function stanford_rsvp_rsvp_form_validate($form, &$form_state) {
+  $event_id  = $form_state['values']['event_id'];
+  $date_id  = $form_state['values']['date_id'];
+  $option_id = $form_state['values']['rsvp_options_' . $date_id];
+
+  // check if there are any spaces available
+  if (!(stanford_rsvp_spaces_available($option_id, $date_id))) {
+    // if not, before we mark this as an error
+    // let's see if the user is already RSVP'ed for this option
+    global $user;
+    $current_option_id = stanford_rsvp_user_rsvp($user->uid, $date_id);
+    if (!(isset($current_option_id)) || ($current_option_id != $option_id)) {
+      form_set_error('rsvp_options_' . $date_id, t('Please choose a valid option.'));
+    }
+  }
+} 
+
+function stanford_rsvp_rsvp_form_submit($form, &$form_state) {
+  global $user;
+  $event_id = $form_state['values']['event_id'];
+  $date_id = $form_state['values']['date_id'];
+  stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id']);
+}
+
+function stanford_rsvp_update_rsvp($uid, $rsvp_option, $event_id, $date_id) {
+  $user = user_load($uid);
+
+  // Log the registration
+//  watchdog('simple_registration','Registered: %user', array('%user' => $user->name));
+  
+  // Create or update the user's status
+  db_merge('stanford_rsvp_rsvps')
+    ->key(array('uid' => $uid, 'eid' => $event_id, 'did' => $date_id))
+    ->fields(array(
+      'oid' => $rsvp_option,
+      'created' => REQUEST_TIME,
+    ))
+    ->execute();
 }
