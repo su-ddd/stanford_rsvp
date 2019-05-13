@@ -16,6 +16,11 @@ function stanford_rsvp_block_info() {
     $blocks['stanford_rsvp_' . $event->nid . '_' . $event->field_dates_value] = array(
       'info'  => t('Stanford RSVP - ' . $event->title . ' - ' . $event->field_date_name_value),
       'cache' => DRUPAL_NO_CACHE,
+      'status' => 1,
+      'region' => 'content',
+      'visibility' => BLOCK_VISIBILITY_LISTED,
+      'pages' => 'node/' . $event->nid,
+      'weight' => 10,
     );
   }
 
@@ -48,14 +53,13 @@ function stanford_rsvp_block_view($delta = '') {
         $block_content .= "<p>Hello " . $user->name . "!</p>";
         $rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
 
-        if ($rsvp) { $block_content .= "<p>Your current RSVP is:<br /><strong>" . stanford_rsvp_option_name($rsvp) . "</strong></p>";
-          	$rsvp_form = drupal_get_form('stanford_rsvp_rsvp_form', $event_id, $date_id);
-          	$block_content .= drupal_render($rsvp_form);
+	if ($rsvp) {
+  		$block_content .= "<p>Your current RSVP is:<br /><strong>" . stanford_rsvp_option_name($rsvp) . "</strong></p>";
         } else {
         	$block_content .= "<p>You haven&rsquo;t RSVP&rsquo;ed yet.</p>";
-          	$rsvp_form = drupal_get_form('stanford_rsvp_rsvp_form', $event_id, $date_id);
-          	$block_content .= drupal_render($rsvp_form);
         }
+      	$rsvp_form = drupal_get_form('stanford_rsvp_rsvp_form-' . $event_id . '-' . $date_id, array($event_id, $date_id));
+       	$block_content .= drupal_render($rsvp_form);
       }
       // if the user is anonymous, we'll ask them to log in before they can register.
       else {
@@ -102,11 +106,26 @@ function stanford_rsvp_option_name($id) {
 }
 
 /**
+ * hook_forms
+ *
+ */
+function stanford_rsvp_forms($form_id, $args) {
+	$forms = array();
+        if (substr($form_id, 0, 23) == 'stanford_rsvp_rsvp_form') {
+		$forms[$form_id]['callback'] = 'stanford_rsvp_rsvp_form';
+	}
+	return $forms;
+}
+
+/**
  * RSVP Form
  */
 
-function stanford_rsvp_rsvp_form($form, $form_state, $event_id, $date_id) {
-  global $user;
+function stanford_rsvp_rsvp_form($form, $form_state, $args) {
+	$event_id = $args[0];
+	$date_id = $args[1];
+	global $user;
+
   $rsvp_options = stanford_rsvp_get_options($date_id);
 
   // check if the options have space available, and if not, note they are full
@@ -139,6 +158,14 @@ function stanford_rsvp_rsvp_form($form, $form_state, $event_id, $date_id) {
     '#type' => 'submit',
     '#value' => t('RSVP')
   );
+  if ($option_value) {
+    $form['cancel'] = array(
+      '#attributes' => array('class' => array('btn', 'btn-danger')),
+      '#type' => 'submit',
+      '#value' => t('Cancel'),
+      '#submit' => array('stanford_rsvp_rsvp_form_cancel'),
+    );
+  }
   return $form;
 }
 
@@ -239,6 +266,14 @@ function stanford_rsvp_rsvp_form_submit($form, &$form_state) {
   stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id']);
 }
 
+function stanford_rsvp_rsvp_form_cancel($form, &$form_state) {
+  global $user;
+  $event_id = $form_state['values']['event_id'];
+  $date_id  = $form_state['values']['date_id'];
+  stanford_rsvp_cancel_rsvp($user->uid, $event_id, $date_id);
+}
+
+
 function stanford_rsvp_update_rsvp($uid, $rsvp_option, $event_id, $date_id) {
   $user = user_load($uid);
 
@@ -253,4 +288,9 @@ function stanford_rsvp_update_rsvp($uid, $rsvp_option, $event_id, $date_id) {
       'created' => REQUEST_TIME,
     ))
     ->execute();
+}
+
+function stanford_rsvp_cancel_rsvp($uid, $event_id, $date_id) {
+  $user = user_load($uid);
+  db_delete('stanford_rsvp_rsvps')->condition('uid', $uid)->condition('eid', $event_id)->condition('did', $date_id)->execute();
 }
