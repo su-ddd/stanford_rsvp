@@ -1,5 +1,8 @@
 <?php
 
+define("REGISTERED", 1);
+define("WAITLISTED", 2);
+
 /**
  * Implementation of hook_block_info()
  * This module creates one block to display RSVP options
@@ -9,17 +12,17 @@ function stanford_rsvp_block_info() {
 
 	$blocks = array();
 
-  # Retrieve a list of active events
-  $events = db_query("select n.nid, n.title, fdfd.field_dates_value, fdfdn.field_date_name_value from field_data_field_dates as fdfd left join node as n on (n.nid = fdfd.entity_id) left join field_data_field_date_name as fdfdn on (fdfd.field_dates_value = fdfdn.entity_id) where n.status = 1 and n.type = 'event';")->fetchAll();
+  # Retrieve a list of active event / date combinations
+  $events = stanford_rsvp_event_date_ids();
 
   foreach ($events as $event) {
-    $blocks['stanford_rsvp_' . $event->nid . '_' . $event->field_dates_value] = array(
-      'info'  => t('Stanford RSVP - ' . $event->title . ' - ' . $event->field_date_name_value),
+    $blocks['stanford_rsvp_' . $event->event_id . '_' . $event->date_id] = array(
+      'info'  => t('Stanford RSVP - ' . $event->event_name . ' - ' . $event->date_name),
       'cache' => DRUPAL_NO_CACHE,
       'status' => 1,
       'region' => 'content',
       'visibility' => BLOCK_VISIBILITY_LISTED,
-      'pages' => 'node/' . $event->nid,
+      'pages' => 'node/' . $event->event_id,
       'weight' => 10,
     );
   }
@@ -39,31 +42,45 @@ function stanford_rsvp_block_view($delta = '') {
   $block = array();
 
   if (preg_match('/stanford_rsvp_/', $delta)) {
+
     $event_date_id = substr($delta, strlen('stanford_rsvp_'));
     list($event_id, $date_id) = explode('_', $event_date_id);
 
-    if (stanford_rsvp_event_active($event_id)) {
+    $event = stanford_rsvp_event($event_id);
+    $date  = stanford_rsvp_date($date_id);
+   
+    drupal_set_message(print_r($date, true));
+    if ($event->status) {
       $block_content = '';
-      $block_content = $event_id . ' - ' . $date_id;
+
       global $user;
-      $block['subject'] = t('RSVP');
+      $block['subject'] = t('RSVP for ') . $date->name;
+      $start_date = date_create($date->start_date);
+      $end_date   = date_create($date->end_date);
+
+      $block_content .= t('Event starts ') . date_format($start_date, 'M dS, Y g:i a') . "<br />";
+      $block_content .= t('Event ends ') . date_format($end_date, 'M dS, Y g:i a');
 
       // if the user is logged in, we check their registration status
       if ($user->uid > 0) {
-        $block_content .= "<p>Hello " . $user->name . "!</p>";
         $rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
 
-	if ($rsvp) {
-  		$block_content .= "<p>Your current RSVP is:<br /><strong>" . $rsvp->option_name . "</strong></p>";
+				if ($rsvp) {
+     	  	if ($rsvp->status == REGISTERED) {
+    				$block_content .= "<p>You are currently registered for: <strong>" . $rsvp->option_name . "</strong></p>";
+      		} else {
+    				$block_content .= "<p>You are currently waitlisted for: <strong>" . $rsvp->option_name . "</strong></p>";
+					}
         } else {
         	$block_content .= "<p>You haven&rsquo;t RSVP&rsquo;ed yet.</p>";
         }
-      	$rsvp_form = drupal_get_form('stanford_rsvp_rsvp_form-' . $event_id . '-' . $date_id, array($event_id, $date_id));
+
+				$rsvp_form = drupal_get_form('stanford_rsvp_rsvp_form-' . $event_id . '-' . $date_id, array($event_id, $date_id));
        	$block_content .= drupal_render($rsvp_form);
       }
       // if the user is anonymous, we'll ask them to log in before they can register.
       else {
-	    $block_content .= '<p>' . t('Please log in to register.') . '</p>';
+		    $block_content .= '<p>' . t('Please log in to register.') . '</p>';
         $block_content .= l(
           'Log in',
           variable_get('stanford_rsvp_login_url', 'user/login'),
@@ -77,15 +94,6 @@ function stanford_rsvp_block_view($delta = '') {
     }
   }
   return $block;
-}
-
-/**
- *  Find the active status of an event
- */
-
-function stanford_rsvp_event_active($id) {
-  $active = db_query('SELECT status FROM {node} WHERE nid = :nid', array(':nid' => $id))->fetchField();
-  return $active;
 }
 
 /**
@@ -129,9 +137,19 @@ function stanford_rsvp_rsvp_form($form, $form_state, $args) {
 	global $user;
 
   $rsvp_options = stanford_rsvp_get_options($date_id);
+  
+  $current_option = '';
+      
+  $current_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+  if ($current_rsvp) {
+    $current_option = $current_rsvp->option_id;
+  }
 
   // check if the options have space available, and if not, note they are full
   foreach ($rsvp_options as $option_id => $option_name) {
+    if ((!empty($current_option)) && ($option_id == $current_option)) {
+      continue;
+    }
     if (!(stanford_rsvp_spaces_available($option_id, $date_id))) {
       if (!(stanford_rsvp_waitlist_available($option_id, $date_id))) {
         $rsvp_options[$option_id] = $option_name . ' - FULL';
@@ -141,13 +159,6 @@ function stanford_rsvp_rsvp_form($form, $form_state, $args) {
     }
   }
 	
-  $current_option = '';
-      
-  $current_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
-  if ($current_rsvp) {
-    $current_option = $current_rsvp->option_id;
-  }
-
   $form['rsvp_options_' . $date_id] = array(
   	'#required' => true,
     '#type' => 'select',
@@ -297,12 +308,22 @@ function stanford_rsvp_rsvp_form_submit($form, &$form_state) {
   } else {
     if ($spaces_available) {
 			stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 1);
+      $event    = stanford_rsvp_event($event_id);
+      $date     = stanford_rsvp_date($date_id);
+      $new_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+      stanford_rsvp_call_webhook($event, $date, $new_rsvp);
  	 	} elseif ($waitlist_available) {
  	 	  stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 2);
  	 	}
 	}
 
 }
+
+/*
+ *
+ * Submit Handler for the cancel button 
+ *
+ */
 
 function stanford_rsvp_rsvp_form_cancel($form, &$form_state) {
   global $user;
@@ -312,7 +333,7 @@ function stanford_rsvp_rsvp_form_cancel($form, &$form_state) {
 }
 
 
-function stanford_rsvp_update_rsvp($uid, $rsvp_option, $event_id, $date_id, $status = 1) {
+function stanford_rsvp_update_rsvp($uid, $rsvp_option, $event_id, $date_id, $status = REGISTERED) {
   $user = user_load($uid);
 
   // Log the registration
@@ -330,7 +351,151 @@ function stanford_rsvp_update_rsvp($uid, $rsvp_option, $event_id, $date_id, $sta
 }
 
 // TODO: keep track of what we are cancelling and then look at the waitlist
+
 function stanford_rsvp_cancel_rsvp($uid, $event_id, $date_id) {
   $user = user_load($uid);
-  db_delete('stanford_rsvp_rsvps')->condition('uid', $uid)->condition('eid', $event_id)->condition('did', $date_id)->execute();
+  $rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+
+  // Did we get an RSVP? If not, return an error.
+  if ($rsvp) {
+  	if ($rsvp->status == REGISTERED) {
+      // is there a person on the waitlist?
+      $first_person_on_waitlist = stanford_rsvp_waitlist_first_user($rsvp->option_id);
+  		// delete the rsvp
+      db_delete('stanford_rsvp_rsvps')->condition('uid', $uid)->condition('eid', $event_id)->condition('did', $date_id)->execute();
+
+      if ($first_person_on_waitlist) {
+        stanford_rsvp_update_rsvp($first_person_on_waitlist, $rsvp->option_id, $event_id, $date_id, REGISTERED);
+      }
+
+   	 // trigger the waitlist for the date and option
+  	} elseif ($rsvp->status == WAITLISTED) {
+  		// delete the rsvp
+      db_delete('stanford_rsvp_rsvps')->condition('uid', $uid)->condition('eid', $event_id)->condition('did', $date_id)->execute();
+    }
+	} else {
+		drupal_set_message('Could not find an RSVP to cancel.', 'error');
+  }
+}
+
+/**
+ *  Find who's next on the waitlist
+ *  Note: there is a chance two people were waitlisted at the same time. In that case, the DB decides which to return
+ */
+
+function stanford_rsvp_waitlist_first_user($oid) {
+//  return db_query('SELECT uid FROM {stanford_rsvp_rsvps} WHERE status = :status and oid = :oid order by created limit 1', array(':status' => WAITLISTED, ':oid' => $oid))->fetchField();
+  return db_select('stanford_rsvp_rsvps','rsvp')
+	  ->fields('rsvp', array('uid'))
+ 	  ->condition('status', WAITLISTED, '=')
+ 	  ->condition('oid', $oid, '=')
+ 	  ->orderBy('created','ASC')
+    ->range(0,1)
+    ->execute()
+    ->fetchField();
+}
+
+/**
+ * Retrieve a list of all active event / date combinations
+ *
+ */
+
+function stanford_rsvp_event_date_ids() {
+  $events = db_query("select n.nid as event_id, n.title as event_name, fdfd.field_dates_value as date_id, fdfdn.field_date_name_value as date_name from field_data_field_dates as fdfd left join node as n on (n.nid = fdfd.entity_id) left join field_data_field_date_name as fdfdn on (fdfd.field_dates_value = fdfdn.entity_id) where n.status = 1 and n.type = 'event';")->fetchAll();
+  return $events;
+}
+
+/**
+ * Retrieve an event's information from the database
+ * Returns an object
+ */
+
+function stanford_rsvp_event($nid) {
+  $event = db_query('SELECT nid, title as name, status FROM {node} as n WHERE n.nid = :nid and n.type = :type', array(':nid' => $nid, ':type' => 'event'))->fetchObject();
+  $event_dates = stanford_rsvp_event_dates($nid);
+  $event->dates = $event_dates;
+  return $event;
+}
+
+/**
+ * Retrieve an event's dates from the database database
+ * Returns an object
+ */
+
+function stanford_rsvp_event_dates($nid) {
+  $dates = db_query('select fdfd.field_dates_value as did from {field_data_field_dates} as fdfd where fdfd.entity_id = :nid', array(':nid' => $nid))->fetchAll();
+  foreach ($dates as $date) {
+    $date->name = stanford_rsvp_date_get_name($date->did);
+    $date->options = stanford_rsvp_date_get_options($date->did); 
+  }
+  return $dates;
+}
+
+/**
+ * Retrieves a date
+ *
+ */
+
+function stanford_rsvp_date($did) {
+  $date = new stdClass();
+  $date->did = $did;
+  $date->name = stanford_rsvp_date_get_name($did);
+  $date->options = stanford_rsvp_date_get_options($date->did); 
+  list($date->start_date, $date->end_date) = stanford_rsvp_date_get_dates($date->did); 
+  $date->max_attendees = stanford_rsvp_date_get_max_attendees($date->did); 
+  return $date;
+}
+
+/**
+ * Retrieve a date's name
+ *
+ */
+
+function stanford_rsvp_date_get_name($did) {
+  $name = db_query('SELECT field_date_name_value FROM {field_data_field_date_name} WHERE entity_id = :did', array(':did' => $did))->fetchField();
+  return $name;
+}
+
+/**
+ * Retrieve a date's name
+ *
+ */
+
+function stanford_rsvp_date_get_max_attendees($did) {
+  $max_rsvps = db_query('select field_date_max_attendees_value from {field_data_field_date_max_attendees} where entity_id = :id', array(':id' => $did))->fetchField();
+  return $max_rsvps;
+}
+
+/**
+ * Retrieve a date's start and end dates
+ *
+ */
+
+function stanford_rsvp_date_get_dates($did) {
+  $result = db_query('SELECT field_event_date_value as start_date, field_event_date_value2 as end_date FROM {field_data_field_event_date} WHERE entity_id = :did', array(':did' => $did))->fetchAll();
+  return array($result[0]->start_date, $result[0]->end_date);
+}
+
+/**
+ * Retrieve the ticket options for a date
+ *
+ */
+
+function stanford_rsvp_date_get_options($did) {
+  $rsvp_options = db_query("select fdft.field_tickets_value as id, fdftn.field_ticket_name_value as name from {field_data_field_tickets} as fdft join {field_data_field_ticket_name} as fdftn on fdft.field_tickets_value = fdftn.entity_id and fdft.bundle = 'date' and fdft.entity_id = :date_id order by fdft.delta ASC", array(':date_id' => $did))->fetchAllKeyed();
+  return $rsvp_options;
+}
+
+/**
+ * Call the Zapier webhook with the RSVP information
+ *
+ */
+
+function stanford_rsvp_call_webhook($event, $date, $rsvp) {
+  global $user;
+  $headers = array('Content-Type' => 'application/json');
+  $webhook = 'https://hooks.zapier.com/hooks/catch/3078895/vynpgi/';
+  $payload = [ 'email' => $user->mail, 'event_name' => $event->name, 'date_name' => $date->name, 'rsvp_name' => $rsvp->option_name, 'start_time' => $date->start_date, 'end_time' => $date->end_date ];
+  $json = json_encode($payload);
+  drupal_http_request($webhook, array('data' => $json, 'method' => 'POST', 'headers' => $headers));
 }
