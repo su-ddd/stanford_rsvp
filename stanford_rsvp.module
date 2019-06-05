@@ -53,12 +53,12 @@ function stanford_rsvp_block_view($delta = '') {
       $block_content = '';
 
       global $user;
-      $block['subject'] = t('RSVP for ') . $date->name;
+//     $block['subject'] = t('RSVP for ') . $date->name;
       $start_date = date_create($date->start_date);
       $end_date   = date_create($date->end_date);
 
-      $block_content .= t('Event starts ') . date_format($start_date, 'M dS, Y g:i a') . "<br />";
-      $block_content .= t('Event ends ') . date_format($end_date, 'M dS, Y g:i a');
+//      $block_content .= t('Event starts ') . date_format($start_date, 'M dS, Y g:i a') . "<br />";
+//      $block_content .= t('Event ends ') . date_format($end_date, 'M dS, Y g:i a');
 
       // if the user is logged in, we check their registration status
       if ($user->uid > 0) {
@@ -66,9 +66,9 @@ function stanford_rsvp_block_view($delta = '') {
 
 				if ($rsvp) {
      	  	if ($rsvp->status == REGISTERED) {
-    				$block_content .= "<p>You are currently registered for: <strong>" . $rsvp->option_name . "</strong></p>";
+    				$block_content .= "<p>You are currently <strong>registered</strong> as: <br /> <strong>" . $rsvp->option_name . "</strong></p>";
       		} else {
-    				$block_content .= "<p>You are currently waitlisted for: <strong>" . $rsvp->option_name . "</strong></p>";
+    				$block_content .= "<p>You are currently <strong>waitlisted</strong> as: <br /><strong>" . $rsvp->option_name . "</strong></p>";
 					}
         } else {
         	$block_content .= "<p>You haven&rsquo;t RSVP&rsquo;ed yet.</p>";
@@ -179,11 +179,21 @@ function stanford_rsvp_rsvp_form($form, $form_state, $args) {
     '#type' => 'hidden',
     '#value' => $date_id,
   );
-  $form['submit'] = array(
-    '#attributes' => array('class' => array('btn')),
-    '#type' => 'submit',
-    '#value' => t('RSVP')
-  );
+  if (($current_option) && (count($rsvp_options) > 1)) {
+    $form['submit'] = array(
+      '#attributes' => array('class' => array('btn')),
+      '#type' => 'submit',
+      '#value' => t('Change RSVP')
+    );
+  } elseif (($current_option) && (count($rsvp_options) < 2)) {
+    # no submit button
+  } else {
+    $form['submit'] = array(
+      '#attributes' => array('class' => array('btn')),
+      '#type' => 'submit',
+      '#value' => t('RSVP')
+    );
+  }
   if ($current_option) {
     $form['cancel'] = array(
       '#attributes' => array('class' => array('btn', 'btn-danger')),
@@ -311,13 +321,18 @@ function stanford_rsvp_rsvp_form_submit($form, &$form_state) {
     drupal_set_message('No change');
   } else {
     if ($spaces_available) {
-			stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 1);
+   	  stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 1);
       $event    = stanford_rsvp_event($event_id);
       $date     = stanford_rsvp_date($date_id);
       $new_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
-      stanford_rsvp_call_webhook($event, $date, $new_rsvp);
- 	 	} elseif ($waitlist_available) {
- 	 	  stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 2);
+      stanford_rsvp_call_webhook($event, $date, $new_rsvp, $user);
+      stanford_rsvp_notify($user, $event, $date, $new_rsvp, 'registration');
+  } elseif ($waitlist_available) {
+    $event    = stanford_rsvp_event($event_id);
+    $date     = stanford_rsvp_date($date_id);
+    $new_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+    stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 2);
+    stanford_rsvp_notify($user, $event, $date, $new_rsvp, 'waitlist');
  	 	}
 	}
 
@@ -333,7 +348,10 @@ function stanford_rsvp_rsvp_form_cancel($form, &$form_state) {
   global $user;
   $event_id = $form_state['values']['event_id'];
   $date_id  = $form_state['values']['date_id'];
+  $event    = stanford_rsvp_event($event_id);
+  $date     = stanford_rsvp_date($date_id);
   stanford_rsvp_cancel_rsvp($user->uid, $event_id, $date_id);
+  stanford_rsvp_notify($user, $event, $date, '', 'cancellation');
 }
 
 
@@ -364,12 +382,18 @@ function stanford_rsvp_cancel_rsvp($uid, $event_id, $date_id) {
   if ($rsvp) {
   	if ($rsvp->status == REGISTERED) {
       // is there a person on the waitlist?
-      $first_person_on_waitlist = stanford_rsvp_waitlist_first_user($rsvp->option_id);
+      $first_person_on_waitlist_id = stanford_rsvp_waitlist_first_user($rsvp->option_id);
   		// delete the rsvp
       db_delete('stanford_rsvp_rsvps')->condition('uid', $uid)->condition('eid', $event_id)->condition('did', $date_id)->execute();
 
-      if ($first_person_on_waitlist) {
-        stanford_rsvp_update_rsvp($first_person_on_waitlist, $rsvp->option_id, $event_id, $date_id, REGISTERED);
+      if ($first_person_on_waitlist_id) {
+        stanford_rsvp_update_rsvp($first_person_on_waitlist_id, $rsvp->option_id, $event_id, $date_id, REGISTERED);
+        $waitlisted_user = user_load($first_person_on_waitlist_id);
+        $event    = stanford_rsvp_event($event_id);
+        $date     = stanford_rsvp_date($date_id);
+        $new_rsvp = stanford_rsvp_user_rsvp($first_person_on_waitlist_id, $date_id);
+        stanford_rsvp_call_webhook($event, $date, $new_rsvp, $waitlisted_user);
+        stanford_rsvp_notify($waitlisted_user, $event, $date, $new_rsvp, 'registration_from_waitlist');
       }
 
    	 // trigger the waitlist for the date and option
@@ -420,6 +444,12 @@ function stanford_rsvp_event($nid) {
   $event->author = $author;
   $event_dates = stanford_rsvp_event_dates($nid);
   $event->dates = $event_dates;
+  $event->description = stanford_rsvp_event_get_description($nid);
+  $event->email = stanford_rsvp_event_get_email($nid);
+  $event->location = stanford_rsvp_event_get_location($nid);
+  $event->info_url = stanford_rsvp_event_get_info_url($nid);
+  $event->zoom = stanford_rsvp_event_get_zoom($nid);
+
   return $event;
 }
 
@@ -435,6 +465,56 @@ function stanford_rsvp_event_dates($nid) {
     $date->options = stanford_rsvp_date_get_options($date->did); 
   }
   return $dates;
+}
+
+/**
+ * Retrieve an event's email address
+ *
+ */
+
+function stanford_rsvp_event_get_description($eid) {
+  $description = db_query('SELECT body_value FROM {field_data_body} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  return $description;
+}
+
+/**
+ * Retrieve an event's email address
+ *
+ */
+
+function stanford_rsvp_event_get_email($eid) {
+  $email = db_query('SELECT field_event_email_value FROM {field_data_field_event_email} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  return $email;
+}
+
+/**
+ * Retrieve an event's location
+ *
+ */
+
+function stanford_rsvp_event_get_location($eid) {
+  $location = db_query('SELECT field_event_location_value FROM {field_data_field_event_location} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  return $location;
+}
+
+/**
+ * Retrieve an event's Zoom Info
+ *
+ */
+
+function stanford_rsvp_event_get_zoom($eid) {
+  $zoom = db_query('SELECT field_event_zoom_id_value FROM {field_data_field_event_zoom_id} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  return $zoom;
+}
+
+/**
+ * Retrieve an event's information URL
+ *
+ */
+
+function stanford_rsvp_event_get_info_url($eid) {
+  $info_url = db_query('SELECT field_event_info_url_value FROM {field_data_field_event_info_url} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  return $info_url;
 }
 
 /**
@@ -497,12 +577,10 @@ function stanford_rsvp_date_get_options($did) {
  *
  */
 
-function stanford_rsvp_call_webhook($event, $date, $rsvp) {
-  global $user;
-  stanford_rsvp_notify($user, $event, $date, $rsvp, 'registration');
+function stanford_rsvp_call_webhook($event, $date, $rsvp, $user) {
   $headers = array('Content-Type' => 'application/json');
   $webhook = 'https://hooks.zapier.com/hooks/catch/3078895/vynpgi/';
-  $payload = [ 'email' => $user->mail, 'event_name' => $event->name, 'date_name' => $date->name, 'rsvp_name' => $rsvp->option_name, 'start_time' => $date->start_date, 'end_time' => $date->end_date ];
+  $payload = [ 'email' => $user->mail, 'event_name' => $event->name, 'date_name' => $date->name, 'rsvp_name' => $rsvp->option_name, 'start_time' => $date->start_date, 'end_time' => $date->end_date, 'location' => $event->location, 'description' => $event->description, 'zoom' => $event->zoom, 'info_url' => $event->info_url, 'name' => $user->name ];
   $json = json_encode($payload);
   drupal_http_request($webhook, array('data' => $json, 'method' => 'POST', 'headers' => $headers));
 }
@@ -516,7 +594,11 @@ function stanford_rsvp_notify($account, $event, $date, $rsvp, $key) {
   $params['event']   = $event;
   $params['date']    = $date;
   $params['rsvp']    = $rsvp;
-  drupal_mail('stanford_rsvp', $key, $account->mail, user_preferred_language($account), $params, $event->author->mail);
+  $from_email = $event->author->mail;
+  if (!empty($event->email)) {
+    $from_email = $event->email;
+  } 
+  drupal_mail('stanford_rsvp', $key, $account->mail, user_preferred_language($account), $params, $from_email);
 }
 
 /**
@@ -530,7 +612,7 @@ function stanford_rsvp_mail($key, &$message, $params) {
   $message['body'][]  = _stanford_rsvp_mail_text($key . '_body',    $language, $variables);
 
   // Find out if the admin wants emails to bcc'ed to an email address 
-  $bcc_email = trim(variable_get('stanford_rsvp_bcc_email', ''));
+  $bcc_email = trim(variable_get('stanford_rsvp_bcc_email', 'marco.wise@stanford.edu'));
   if (!empty($bcc_email)) {
     $message['headers']['Bcc'] = $bcc_email;
   }
@@ -547,20 +629,21 @@ function _stanford_rsvp_mail_text($key, $language = NULL, $variables = array(), 
     // No override, return default string.
     switch($key) {
       case 'waitlist_subject':
-        $text = t('Waitlist Receipt from [site:name]', array(), array('langcode' => $langcode));
+        $text = t('Waitlist Receipt for @event-name', array('@event-name' => $variables['event']->name), array('langcode' => $langcode));
         break;
       case 'waitlist_body':
-        $text = t("Dear [user:name],\n\nYou have been wait listed for the [site:name].
-                   \nAs people cancel, the first person on the wait list will be automatically registered.
+        $text = t("Dear [user:name],\n\nYou have been waitlisted for @event-name.
+                   \nAs cancellations occur, those who are at the top of the waitlist will automatically be registered.
                    \nIf that's you, you will receive an email to confirm your registration.
-                  ", array(), array('langcode' => $langcode));
+                  ", array('@event-name' => $variables['event']->name), array('langcode' => $langcode));
         break;
       case 'cancellation_subject':
-        $text = t('Cancellation Receipt from [site:name]', array(), array('langcode' => $langcode));
+        $text = t('Cancellation Receipt for @event-name', array('@event-name' => $variables['event']->name), array('langcode' => $langcode));
         break;
       case 'cancellation_body':
         $text = t("Dear [user:name],
                   \nAs requested, we've cancelled your registration. We are sorry we won't get to see you at the event.
+                  \nIf you received an invitation for the event, please decline the calendar invite as well.
                   ", array(), array('langcode' => $langcode));
         break;
       case 'registration_subject':
@@ -568,20 +651,22 @@ function _stanford_rsvp_mail_text($key, $language = NULL, $variables = array(), 
         break;
       case 'registration_body':
         $text = t("Dear [user:name],
-                  \nYou have been registered for @event-name on @event-date-start-date.
-                  \nIf for some reason you are unable to attend, we would ask that you kindly cancel your registration so that waitlisted registrants can be accommodated. To cancel your registration, please go to the following link:
-                  \n[site:url]/node/@event-id
-                  ", array('@event-name' => $variables['event']->name, '@event-id' => $variables['event']->nid, '@event-date-start-date' => $variables['event-date']->start_date), array('langcode' => $langcode));
+                  \nYou have been registered for @event-name.
+                  \nA calendar invite will follow shortly.
+                  \nIf for some reason you are unable to attend, we ask that you kindly cancel your registration so that waitlisted registrants can be accommodated. To cancel your registration, please go to the following link:
+                  \n@event-url
+                  ", array('@event-name' => $variables['event']->name, '@event-url' => $variables['event']->info_url, '@event-date-start-date' => $variables['event-date']->start_date), array('langcode' => $langcode));
         break;
       case 'registration_from_waitlist_subject':
-        $text = t('Registration Receipt from [site:name]', array(), array('langcode' => $langcode));
+        $text = t("Registration Receipt for @event-name", array('@event-name' => $variables['event']->name), array('langcode' => $langcode));
         break;
       case 'registration_from_waitlist_body':
         $text = t("Dear [user:name],
-                  \nCongratulations! A spot opened up and you have been registered for the [site:name].
+                  \nCongratulations! A spot opened up and you have been registered for @event-name.
+                  \nA calendar invite will follow shortly.
                   \nIf for some reason you are unable to attend, we would ask that you kindly cancel your registration so that waitlisted registrants can be accommodated. To cancel your registration, please go to the following link:
-                  \n[site:url]
-                  ", array(), array('langcode' => $langcode));
+                  \n@event-url
+                  ", array('@event-name' => $variables['event']->name, '@event-url' => $variables['event']->info_url), array('langcode' => $langcode));
         break;
       }
   }
@@ -628,8 +713,8 @@ function stanford_rsvp_menu() {
     'access arguments' => array(1),
     'file' => 'stanford_rsvp.admin.inc',
     'type' => MENU_LOCAL_TASK,
-//    'theme callback' => 'variable_get',
-//    'theme arguments' => array('admin_theme'),
+    'theme callback' => 'variable_get',
+    'theme arguments' => array('admin_theme'),
     'weight' => 3,
   );
 
@@ -665,6 +750,10 @@ function stanford_rsvp_attendees_page_access($node) {
  */
 
 function stanford_rsvp_user_can_administer($user, $node) {
+  $event_admin_role = user_role_load_by_name('Event Admin');
+  if (user_has_role($event_admin_role->rid, $user)) {
+    return true;
+  }
   if ($user->uid === $node->uid) {
     return true;
   } else {
