@@ -2,6 +2,7 @@
 
 define("REGISTERED", 1);
 define("WAITLISTED", 2);
+define("CANCELLED", 3);
 
 /**
  * Implementation of hook_block_info()
@@ -63,13 +64,14 @@ function stanford_rsvp_block_view($delta = '') {
       // if the user is logged in, we check their registration status
       if ($user->uid > 0) {
         $rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
-
-				if ($rsvp) {
-     	  	if ($rsvp->status == REGISTERED) {
-    				$block_content .= "<p>You are currently <strong>registered</strong> as: <br /> <strong>" . $rsvp->option_name . "</strong></p>";
-      		} else {
-    				$block_content .= "<p>You are currently <strong>waitlisted</strong> as: <br /><strong>" . $rsvp->option_name . "</strong></p>";
-					}
+		if ($rsvp) {
+          if ($rsvp->status == REGISTERED) {
+    	    $block_content .= "<p>You are currently <strong>registered</strong> as: <br /> <strong>" . $rsvp->option_name . "</strong></p>";
+          } elseif ($rsvp->status == WAITLISTED) {
+    	    $block_content .= "<p>You are currently <strong>waitlisted</strong> as: <br /><strong>" . $rsvp->option_name . "</strong></p>";
+		  } else {
+    	    $block_content .= "<p>Your current selection is: <br /><strong>" . $rsvp->option_name . "</strong></p>";
+          } 
         } else {
         	$block_content .= "<p>You haven&rsquo;t RSVP&rsquo;ed yet.</p>";
         }
@@ -194,13 +196,15 @@ function stanford_rsvp_rsvp_form($form, $form_state, $args) {
       '#value' => t('RSVP')
     );
   }
-  if ($current_option) {
-    $form['cancel'] = array(
-      '#attributes' => array('class' => array('btn', 'btn-danger')),
-      '#type' => 'submit',
-      '#value' => t('Cancel'),
-      '#submit' => array('stanford_rsvp_rsvp_form_cancel'),
-    );
+  if ($current_option)  {
+    if (stanford_rsvp_get_ticket_type($current_option) != 'cancel') {
+      $form['cancel'] = array(
+        '#attributes' => array('class' => array('btn', 'btn-danger')),
+        '#type' => 'submit',
+        '#value' => t('Cancel'),
+        '#submit' => array('stanford_rsvp_rsvp_form_cancel'),
+      );
+    }
   }
   return $form;
 }
@@ -273,8 +277,10 @@ function stanford_rsvp_date_spaces_available($date_id) {
   
   // count the total RSVPs for all options
   foreach (array_keys($rsvp_options) as $option) {
-    $option_rsvps = db_query('SELECT count(1) FROM {stanford_rsvp_rsvps} WHERE oid = :oid', array(':oid' => $option))->fetchField();
-    $total_rsvps += $option_rsvps;
+    if (stanford_rsvp_get_ticket_type($option) != 'cancel') {
+      $option_rsvps = db_query('SELECT count(1) FROM {stanford_rsvp_rsvps} WHERE oid = :oid', array(':oid' => $option))->fetchField();
+      $total_rsvps += $option_rsvps;
+    }
   }
 
   // Don't count the RSVP for this user, if they are registered
@@ -313,6 +319,7 @@ function stanford_rsvp_rsvp_form_submit($form, &$form_state) {
   $event_id = $form_state['values']['event_id'];
   $date_id = $form_state['values']['date_id'];
   $selected_option_id = $form_state['values']['rsvp_options_' . $date_id];
+
   $current_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
   $spaces_available = stanford_rsvp_spaces_available($selected_option_id, $date_id);
   $waitlist_available = stanford_rsvp_waitlist_available($selected_option_id, $date_id);
@@ -320,22 +327,28 @@ function stanford_rsvp_rsvp_form_submit($form, &$form_state) {
   if ($current_rsvp && ($current_rsvp->option_id == $selected_option_id)) {
     drupal_set_message('No change');
   } else {
-    if ($spaces_available) {
+    if (stanford_rsvp_get_ticket_type($selected_option_id) === 'cancel') {
+   	  stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 3);
+      if ($current_rsvp) {
+        $event    = stanford_rsvp_event($event_id);
+        $date     = stanford_rsvp_date($date_id);
+        stanford_rsvp_notify($user, $event, $date, '', 'cancellation');
+      }
+    } elseif ($spaces_available) {
    	  stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 1);
       $event    = stanford_rsvp_event($event_id);
       $date     = stanford_rsvp_date($date_id);
       $new_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
       stanford_rsvp_call_webhook($event, $date, $new_rsvp, $user);
       stanford_rsvp_notify($user, $event, $date, $new_rsvp, 'registration');
-  } elseif ($waitlist_available) {
-    $event    = stanford_rsvp_event($event_id);
-    $date     = stanford_rsvp_date($date_id);
-    $new_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
-    stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 2);
-    stanford_rsvp_notify($user, $event, $date, $new_rsvp, 'waitlist');
- 	 	}
-	}
-
+    } elseif ($waitlist_available) {
+      $event    = stanford_rsvp_event($event_id);
+      $date     = stanford_rsvp_date($date_id);
+      $new_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+      stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 2);
+      stanford_rsvp_notify($user, $event, $date, $new_rsvp, 'waitlist');
+ 	}
+  }
 }
 
 /*
@@ -570,6 +583,15 @@ function stanford_rsvp_date_get_dates($did) {
 function stanford_rsvp_date_get_options($did) {
   $rsvp_options = db_query("select fdft.field_tickets_value as id, fdftn.field_ticket_name_value as name from {field_data_field_tickets} as fdft join {field_data_field_ticket_name} as fdftn on fdft.field_tickets_value = fdftn.entity_id and fdft.bundle = 'date' and fdft.entity_id = :date_id order by fdft.delta ASC", array(':date_id' => $did))->fetchAllKeyed();
   return $rsvp_options;
+}
+
+function stanford_rsvp_get_ticket_type($oid) {
+  $type = db_query("select field_ticket_option_type_value from {field_data_field_ticket_option_type} where entity_id = :oid", array(':oid' => $oid))->fetchField();
+  if ($type) {
+    return $type;
+  } else {
+    return 'attend';
+  }
 }
 
 /**
