@@ -501,7 +501,7 @@ function stanford_rsvp_call_webhook($event, $date, $rsvp) {
   global $user;
   stanford_rsvp_notify($user, $event, $date, $rsvp, 'registration');
   $headers = array('Content-Type' => 'application/json');
-  $webhook = 'https://hooks.zapier.com/hooks/catch/3078895/vynpgi/';
+  $webhook = variable_get('stanford_rsvp_webhook');
   $payload = [ 'email' => $user->mail, 'event_name' => $event->name, 'date_name' => $date->name, 'rsvp_name' => $rsvp->option_name, 'start_time' => $date->start_date, 'end_time' => $date->end_date ];
   $json = json_encode($payload);
   drupal_http_request($webhook, array('data' => $json, 'method' => 'POST', 'headers' => $headers));
@@ -633,6 +633,14 @@ function stanford_rsvp_menu() {
     'weight' => 3,
   );
 
+  $items['rsvp_embed/%'] = array(
+    'title' => 'Embed Test',
+    'page callback' => 'stanford_rsvp_embed',
+    'page arguments' => array(1),
+    'access callback' => true,
+    'access arguments' => array(1),
+  );
+
   return $items;
 }
 
@@ -670,4 +678,9 @@ function stanford_rsvp_user_can_administer($user, $node) {
   } else {
     return false;
   }
+}
+
+function stanford_rsvp_embed($date_id) {
+ $block = module_invoke('stanford_rsvp', 'block_view', 'stanford_rsvp_3_' . $date_id);
+ return render($block['content']);
 }
