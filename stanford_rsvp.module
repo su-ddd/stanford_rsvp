@@ -4,13 +4,16 @@ define("REGISTERED", 1);
 define("WAITLISTED", 2);
 define("CANCELLED", 3);
 
+function stanford_rsvp_init() {
+  _block_rehash('stanford_rsvp');
+}
 /**
  * Implementation of hook_block_info()
  * This module creates one block to display RSVP options
  */
 
 function stanford_rsvp_block_info() {
-
+  
 	$blocks = array();
 
   # Retrieve a list of active event / date combinations
@@ -21,7 +24,7 @@ function stanford_rsvp_block_info() {
       'info'  => t('Stanford RSVP - ' . $event->event_name . ' - ' . $event->date_name),
       'cache' => DRUPAL_NO_CACHE,
       'status' => 1,
-      'region' => 'content',
+      'region' => 'sidebar_second',
       'visibility' => BLOCK_VISIBILITY_LISTED,
       'pages' => 'node/' . $event->event_id,
       'weight' => 10,
@@ -54,7 +57,7 @@ function stanford_rsvp_block_view($delta = '') {
       $block_content = '';
 
       global $user;
-//     $block['subject'] = t('RSVP for ') . $date->name;
+      $block['subject'] = t('RSVP for ') . $date->name;
       $start_date = date_create($date->start_date);
       $end_date   = date_create($date->end_date);
 
@@ -84,7 +87,7 @@ function stanford_rsvp_block_view($delta = '') {
 		    $block_content .= '<p>' . t('Please log in to register.') . '</p>';
         $block_content .= l(
           'Log in',
-          variable_get('stanford_rsvp_login_url', 'user/login'),
+          variable_get('stanford_rsvp_login_url', 'sso/login'),
           array(
             'attributes' => array('class' => array('btn success')),
             'query'      => array(drupal_get_destination())
@@ -538,6 +541,7 @@ function stanford_rsvp_event_get_info_url($eid) {
 function stanford_rsvp_date($did) {
   $date = new stdClass();
   $date->did = $did;
+  $date->eid = stanford_rsvp_date_get_event_id($did);
   $date->name = stanford_rsvp_date_get_name($did);
   $date->options = stanford_rsvp_date_get_options($date->did); 
   list($date->start_date, $date->end_date) = stanford_rsvp_date_get_dates($date->did); 
@@ -556,7 +560,7 @@ function stanford_rsvp_date_get_name($did) {
 }
 
 /**
- * Retrieve a date's name
+ * Retrieve a date's max attendees
  *
  */
 
@@ -592,6 +596,17 @@ function stanford_rsvp_get_ticket_type($oid) {
   } else {
     return 'attend';
   }
+}
+
+/**
+ * Retrieve the date's event ID
+ *
+ *
+ */
+
+function stanford_rsvp_date_get_event_id($did) {
+  $event_id = db_query('SELECT entity_id FROM {field_data_field_dates} WHERE field_dates_value = :did', array(':did' => $did))->fetchField();
+  return $event_id;
 }
 
 /**
@@ -741,10 +756,10 @@ function stanford_rsvp_menu() {
   );
 
   $items['rsvp_embed/%'] = array(
-    'title' => 'Embed Test',
+    'title' => 'RSVP',
     'page callback' => 'stanford_rsvp_embed',
     'page arguments' => array(1),
-    'access callback' => true,
+    'access callback' => true, //'stanford_rsvp_embed_access',
     'access arguments' => array(1),
   );
 
@@ -771,6 +786,10 @@ function stanford_rsvp_attendees_page_access($node) {
   }
 }
 
+function stanford_rsvp_embed_access($node) {
+  return !user_is_anonymous();
+}
+
 /* 
  * Find out if user can administer an event
  * For now, that's only if the user created the event
@@ -792,6 +811,52 @@ function stanford_rsvp_user_can_administer($user, $node) {
 }
 
 function stanford_rsvp_embed($date_id) {
- $block = module_invoke('stanford_rsvp', 'block_view', 'stanford_rsvp_3_' . $date_id);
- return render($block['content']);
+  $date = stanford_rsvp_date($date_id);
+  $event_id = $date->eid;
+  $block = module_invoke('stanford_rsvp', 'block_view', 'stanford_rsvp_' . $event_id . '_' . $date_id);
+  $content = render($block['content']);
+  return(theme('stanford_rsvp_embed_template', array('content' => $content)));
 }
+
+function stanford_rsvp_theme($existing, $type, $theme, $path) {
+  $theme = array();
+
+  $theme['stanford_rsvp_embed_template'] = 
+    array(
+      'variables' => array('content' => NULL),
+      'template' => 'stanford-rsvp-embed-template',
+      'path'     => drupal_get_path('module', 'stanford_rsvp') . '/templates',
+    );
+/*
+  $theme['stanford_rsvp_embed_html'] = 
+    array(
+      'template' => 'stanford-rsvp-embed-html',
+      'path' => drupal_get_path('module', 'stanford_rsvp') . '/templates',
+    );
+  $theme['stanford_rsvp_embed_page'] = 
+    array(
+      'template' => 'stanford-rsvp-embed-page',
+      'path' => drupal_get_path('module', 'stanford_rsvp') . '/templates',
+    );
+*/
+  return $theme;
+}
+
+/*
+function stanford_rsvp_preprocess_html(&$vars) {
+  $path = current_path();
+  $pattern = 'rsvp_embed';
+  // Add a new theme suggestion when viewing node's of mynodetype.
+  if (drupal_match_path($path, $pattern)) {
+    $vars['theme_hook_suggestions'][] = 'stanford_rsvp_embed_html';
+  }
+}
+
+function stanford_rsvp_preprocess_page(&$vars) {
+  $path = current_path();
+  $pattern = 'rsvp_embed';
+  if (drupal_match_path($path, $pattern)) {
+    $vars['theme_hook_suggestions'][] = 'stanford_rsvp_embed_page';
+  }
+}
+*/
