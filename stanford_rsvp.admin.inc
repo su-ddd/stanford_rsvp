@@ -15,9 +15,9 @@ function stanford_rsvp_attendees_page($form, &$form_state, $node) {
     foreach ($date->options as $option_id => $option_name) {
       $content .= '<h3>' . $option_name . '</h3>';
       if (stanford_rsvp_get_ticket_type($option_id) == 'cancel') {
-        $rsvps = stanford_rsvp_rsvps($option_id, CANCELLED);
+        $rsvps = stanford_rsvp_rsvps($option_id, STANFORD_RSVP_CANCELLED);
       } else {
-        $rsvps = stanford_rsvp_rsvps($option_id, REGISTERED);
+        $rsvps = stanford_rsvp_rsvps($option_id, STANFORD_RSVP_REGISTERED);
       }
 
       $rows = array();

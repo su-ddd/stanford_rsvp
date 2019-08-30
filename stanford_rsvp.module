@@ -1,8 +1,8 @@
 <?php
 
-define("REGISTERED", 1);
-define("WAITLISTED", 2);
-define("CANCELLED", 3);
+define("STANFORD_RSVP_REGISTERED", 1);
+define("STANFORD_RSVP_WAITLISTED", 2);
+define("STANFORD_RSVP_CANCELLED", 3);
 
 /**
  * Implementation of hook_block_info()
@@ -65,9 +65,9 @@ function stanford_rsvp_block_view($delta = '') {
       if ($user->uid > 0) {
         $rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
 		if ($rsvp) {
-          if ($rsvp->status == REGISTERED) {
+          if ($rsvp->status == STANFORD_RSVP_REGISTERED) {
     	    $block_content .= "<p>You are currently <strong>registered</strong> as: <br /> <strong>" . $rsvp->option_name . "</strong></p>";
-          } elseif ($rsvp->status == WAITLISTED) {
+          } elseif ($rsvp->status == STANFORD_RSVP_WAITLISTED) {
     	    $block_content .= "<p>You are currently <strong>waitlisted</strong> as: <br /><strong>" . $rsvp->option_name . "</strong></p>";
 		  } else {
     	    $block_content .= "<p>Your current selection is: <br /><strong>" . $rsvp->option_name . "</strong></p>";
@@ -106,7 +106,7 @@ function stanford_rsvp_user_rsvp($uid, $did) {
   $current_rsvp = db_query('SELECT oid, status FROM {stanford_rsvp_rsvps} WHERE uid = :uid and did = :did', array(':uid' => $uid, ':did' => $did))->fetchObject();
 
   if ($current_rsvp) {
-    $option_name = db_query('SELECT fdftn.field_ticket_name_value from {field_data_field_tickets} as fdft join {field_data_field_ticket_name} as fdftn on (fdft.field_tickets_value = fdftn.entity_id) where fdft.field_tickets_value = :id', array(':id' => $current_rsvp->oid))->fetchField();
+    $option_name = db_query('SELECT fdftn.field_su_rsvp_t_name_value from {field_data_field_su_rsvp_d_tickets} as fdft join {field_data_field_su_rsvp_t_name} as fdftn on (fdft.field_su_rsvp_d_tickets_value = fdftn.entity_id) where fdft.field_su_rsvp_d_tickets_value = :id', array(':id' => $current_rsvp->oid))->fetchField();
     $rsvp->option_id   = $current_rsvp->oid;
     $rsvp->option_name = $option_name;
     $rsvp->status      = $current_rsvp->status;
@@ -210,7 +210,7 @@ function stanford_rsvp_rsvp_form($form, $form_state, $args) {
 }
 
 function stanford_rsvp_get_options($date_id) {
-  $rsvp_options = db_query("select fdft.field_tickets_value as id, fdftn.field_ticket_name_value as name from {field_data_field_tickets} as fdft join {field_data_field_ticket_name} as fdftn on fdft.field_tickets_value = fdftn.entity_id and fdft.bundle = 'date' and fdft.entity_id = :date_id order by fdft.delta ASC", array(':date_id' => $date_id))->fetchAllKeyed();
+  $rsvp_options = db_query("select fdft.field_su_rsvp_d_tickets_value as id, fdftn.field_su_rsvp_t_name_value as name from {field_data_field_su_rsvp_d_tickets} as fdft join {field_data_field_su_rsvp_t_name} as fdftn on fdft.field_su_rsvp_d_tickets_value = fdftn.entity_id and fdft.bundle = 'stanford_rsvp_date' and fdft.entity_id = :date_id order by fdft.delta ASC", array(':date_id' => $date_id))->fetchAllKeyed();
   return $rsvp_options;
 }
 
@@ -228,7 +228,7 @@ function stanford_rsvp_spaces_available($option_id, $date_id) {
 
   // get the maximum number of rsvps
   //  $max_rsvps = db_query('SELECT max_rsvps FROM {simple_rsvp_rt_options} WHERE id = :id and eid = :eid', array(':id' => $option_id, ':eid' => $event_id))->fetchField();
-  $max_rsvps = db_query('SELECT field_ticket_max_attendees_value from {field_data_field_ticket_max_attendees} where entity_id = :id', array(':id' => $option_id))->fetchField();
+  $max_rsvps = db_query('SELECT field_su_rsvp_t_max_attendees_value from {field_data_field_su_rsvp_t_max_attendees} where entity_id = :id', array(':id' => $option_id))->fetchField();
 
   // if the value is null, there is no limit
   if ($max_rsvps == null) {
@@ -246,7 +246,7 @@ function stanford_rsvp_spaces_available($option_id, $date_id) {
 }
 
 function stanford_rsvp_waitlist_available($option_id, $date_id) {
-  $max_waitlist = db_query('SELECT field_ticket_max_waitlist_value from {field_data_field_ticket_max_waitlist} where entity_id = :id', array(':id' => $option_id))->fetchField();
+  $max_waitlist = db_query('SELECT field_su_rsvp_t_max_waitlist_value from {field_data_field_su_rsvp_t_max_waitlist} where entity_id = :id', array(':id' => $option_id))->fetchField();
   if ($max_waitlist == null) {
     return true;
   }
@@ -263,7 +263,7 @@ function stanford_rsvp_waitlist_available($option_id, $date_id) {
 function stanford_rsvp_date_spaces_available($date_id) {
   global $user;
 
-  $max_rsvps_per_date = db_query('select field_date_max_attendees_value from {field_data_field_date_max_attendees} where entity_id = :id', array(':id' => $date_id))->fetchField();
+  $max_rsvps_per_date = db_query('select field_su_rsvp_d_max_attendees_value from {field_data_field_su_rsvp_d_max_attendees} where entity_id = :id', array(':id' => $date_id))->fetchField();
 
   if (!$max_rsvps_per_date) {
     $max_rsvps_per_date = 0;
@@ -368,7 +368,7 @@ function stanford_rsvp_rsvp_form_cancel($form, &$form_state) {
 }
 
 
-function stanford_rsvp_update_rsvp($uid, $rsvp_option, $event_id, $date_id, $status = REGISTERED) {
+function stanford_rsvp_update_rsvp($uid, $rsvp_option, $event_id, $date_id, $status = STANFORD_RSVP_REGISTERED) {
   $user = user_load($uid);
 
   // Log the registration
@@ -393,14 +393,14 @@ function stanford_rsvp_cancel_rsvp($uid, $event_id, $date_id) {
 
   // Did we get an RSVP? If not, return an error.
   if ($rsvp) {
-  	if ($rsvp->status == REGISTERED) {
+  	if ($rsvp->status == STANFORD_RSVP_REGISTERED) {
       // is there a person on the waitlist?
       $first_person_on_waitlist_id = stanford_rsvp_waitlist_first_user($rsvp->option_id);
   		// delete the rsvp
       db_delete('stanford_rsvp_rsvps')->condition('uid', $uid)->condition('eid', $event_id)->condition('did', $date_id)->execute();
 
       if ($first_person_on_waitlist_id) {
-        stanford_rsvp_update_rsvp($first_person_on_waitlist_id, $rsvp->option_id, $event_id, $date_id, REGISTERED);
+        stanford_rsvp_update_rsvp($first_person_on_waitlist_id, $rsvp->option_id, $event_id, $date_id, STANFORD_RSVP_REGISTERED);
         $waitlisted_user = user_load($first_person_on_waitlist_id);
         $event    = stanford_rsvp_event($event_id);
         $date     = stanford_rsvp_date($date_id);
@@ -410,7 +410,7 @@ function stanford_rsvp_cancel_rsvp($uid, $event_id, $date_id) {
       }
 
    	 // trigger the waitlist for the date and option
-  	} elseif ($rsvp->status == WAITLISTED) {
+  	} elseif ($rsvp->status == STANFORD_RSVP_WAITLISTED) {
   		// delete the rsvp
       db_delete('stanford_rsvp_rsvps')->condition('uid', $uid)->condition('eid', $event_id)->condition('did', $date_id)->execute();
     }
@@ -425,10 +425,10 @@ function stanford_rsvp_cancel_rsvp($uid, $event_id, $date_id) {
  */
 
 function stanford_rsvp_waitlist_first_user($oid) {
-//  return db_query('SELECT uid FROM {stanford_rsvp_rsvps} WHERE status = :status and oid = :oid order by created limit 1', array(':status' => WAITLISTED, ':oid' => $oid))->fetchField();
+//  return db_query('SELECT uid FROM {stanford_rsvp_rsvps} WHERE status = :status and oid = :oid order by created limit 1', array(':status' => STANFORD_RSVP_WAITLISTED, ':oid' => $oid))->fetchField();
   return db_select('stanford_rsvp_rsvps','rsvp')
 	  ->fields('rsvp', array('uid'))
- 	  ->condition('status', WAITLISTED, '=')
+ 	  ->condition('status', STANFORD_RSVP_WAITLISTED, '=')
  	  ->condition('oid', $oid, '=')
  	  ->orderBy('created','ASC')
     ->range(0,1)
@@ -442,7 +442,7 @@ function stanford_rsvp_waitlist_first_user($oid) {
  */
 
 function stanford_rsvp_event_date_ids() {
-  $events = db_query("select n.nid as event_id, n.title as event_name, fdfd.field_dates_value as date_id, fdfdn.field_date_name_value as date_name from field_data_field_dates as fdfd left join node as n on (n.nid = fdfd.entity_id) left join field_data_field_date_name as fdfdn on (fdfd.field_dates_value = fdfdn.entity_id) where n.status = 1 and n.type = 'event';")->fetchAll();
+  $events = db_query("select n.nid as event_id, n.title as event_name, fdfd.field_stanford_rsvp_dates_value as date_id, fdfdn.field_su_rsvp_d_name_value as date_name from field_data_field_stanford_rsvp_dates as fdfd left join node as n on (n.nid = fdfd.entity_id) left join field_data_field_su_rsvp_d_name as fdfdn on (fdfd.field_stanford_rsvp_dates_value = fdfdn.entity_id) where n.status = 1 and n.type = 'stanford_rsvp';")->fetchAll();
   return $events;
 }
 
@@ -452,7 +452,7 @@ function stanford_rsvp_event_date_ids() {
  */
 
 function stanford_rsvp_event($nid) {
-  $event = db_query('SELECT nid, uid, title as name, status FROM {node} as n WHERE n.nid = :nid and n.type = :type', array(':nid' => $nid, ':type' => 'event'))->fetchObject();
+  $event = db_query('SELECT nid, uid, title as name, status FROM {node} as n WHERE n.nid = :nid and n.type = :type', array(':nid' => $nid, ':type' => 'stanford_rsvp'))->fetchObject();
   $author = user_load($event->uid);
   $event->author = $author;
   $event_dates = stanford_rsvp_event_dates($nid);
@@ -472,7 +472,7 @@ function stanford_rsvp_event($nid) {
  */
 
 function stanford_rsvp_event_dates($nid) {
-  $dates = db_query('select fdfd.field_dates_value as did from {field_data_field_dates} as fdfd where fdfd.entity_id = :nid', array(':nid' => $nid))->fetchAll();
+  $dates = db_query('select fdfd.field_stanford_rsvp_dates_value as did from {field_data_field_stanford_rsvp_dates} as fdfd where fdfd.entity_id = :nid', array(':nid' => $nid))->fetchAll();
   foreach ($dates as $date) {
     $date->name = stanford_rsvp_date_get_name($date->did);
     $date->options = stanford_rsvp_date_get_options($date->did); 
@@ -496,7 +496,7 @@ function stanford_rsvp_event_get_description($eid) {
  */
 
 function stanford_rsvp_event_get_email($eid) {
-  $email = db_query('SELECT field_event_email_value FROM {field_data_field_event_email} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  $email = db_query('SELECT field_stanford_rsvp_email_value FROM {field_data_field_stanford_rsvp_email} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
   return $email;
 }
 
@@ -506,7 +506,7 @@ function stanford_rsvp_event_get_email($eid) {
  */
 
 function stanford_rsvp_event_get_location($eid) {
-  $location = db_query('SELECT field_event_location_value FROM {field_data_field_event_location} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  $location = db_query('SELECT field_stanford_rsvp_location_value FROM {field_data_field_stanford_rsvp_location} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
   return $location;
 }
 
@@ -516,7 +516,7 @@ function stanford_rsvp_event_get_location($eid) {
  */
 
 function stanford_rsvp_event_get_zoom($eid) {
-  $zoom = db_query('SELECT field_event_zoom_id_value FROM {field_data_field_event_zoom_id} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  $zoom = db_query('SELECT field_stanford_rsvp_zoom_id_value FROM {field_data_field_stanford_rsvp_zoom_id} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
   return $zoom;
 }
 
@@ -526,7 +526,7 @@ function stanford_rsvp_event_get_zoom($eid) {
  */
 
 function stanford_rsvp_event_get_info_url($eid) {
-  $info_url = db_query('SELECT field_event_info_url_value FROM {field_data_field_event_info_url} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  $info_url = db_query('SELECT field_stanford_rsvp_info_url_value FROM {field_data_field_stanford_rsvp_info_url} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
   return $info_url;
 }
 
@@ -551,7 +551,7 @@ function stanford_rsvp_date($did) {
  */
 
 function stanford_rsvp_date_get_name($did) {
-  $name = db_query('SELECT field_date_name_value FROM {field_data_field_date_name} WHERE entity_id = :did', array(':did' => $did))->fetchField();
+  $name = db_query('SELECT field_su_rsvp_d_name_value FROM {field_data_field_su_rsvp_d_name} WHERE entity_id = :did', array(':did' => $did))->fetchField();
   return $name;
 }
 
@@ -561,7 +561,7 @@ function stanford_rsvp_date_get_name($did) {
  */
 
 function stanford_rsvp_date_get_max_attendees($did) {
-  $max_rsvps = db_query('select field_date_max_attendees_value from {field_data_field_date_max_attendees} where entity_id = :id', array(':id' => $did))->fetchField();
+  $max_rsvps = db_query('select field_su_rsvp_d_max_attendees_value from {field_data_field_su_rsvp_d_max_attendees} where entity_id = :id', array(':id' => $did))->fetchField();
   return $max_rsvps;
 }
 
@@ -571,7 +571,7 @@ function stanford_rsvp_date_get_max_attendees($did) {
  */
 
 function stanford_rsvp_date_get_dates($did) {
-  $result = db_query('SELECT field_event_date_value as start_date, field_event_date_value2 as end_date FROM {field_data_field_event_date} WHERE entity_id = :did', array(':did' => $did))->fetchAll();
+  $result = db_query('SELECT field_su_rsvp_d_date_value as start_date, field_su_rsvp_d_date_value2 as end_date FROM {field_data_field_su_rsvp_d_date} WHERE entity_id = :did', array(':did' => $did))->fetchAll();
   return array($result[0]->start_date, $result[0]->end_date);
 }
 
@@ -581,12 +581,12 @@ function stanford_rsvp_date_get_dates($did) {
  */
 
 function stanford_rsvp_date_get_options($did) {
-  $rsvp_options = db_query("select fdft.field_tickets_value as id, fdftn.field_ticket_name_value as name from {field_data_field_tickets} as fdft join {field_data_field_ticket_name} as fdftn on fdft.field_tickets_value = fdftn.entity_id and fdft.bundle = 'date' and fdft.entity_id = :date_id order by fdft.delta ASC", array(':date_id' => $did))->fetchAllKeyed();
+  $rsvp_options = db_query("select fdft.field_su_rsvp_d_tickets_value as id, fdftn.field_su_rsvp_t_name_value as name from {field_data_field_su_rsvp_d_tickets} as fdft join {field_data_field_su_rsvp_t_name} as fdftn on fdft.field_su_rsvp_d_tickets_value = fdftn.entity_id and fdft.bundle = 'stanford_rsvp_date' and fdft.entity_id = :date_id order by fdft.delta ASC", array(':date_id' => $did))->fetchAllKeyed();
   return $rsvp_options;
 }
 
 function stanford_rsvp_get_ticket_type($oid) {
-  $type = db_query("select field_ticket_option_type_value from {field_data_field_ticket_option_type} where entity_id = :oid", array(':oid' => $oid))->fetchField();
+  $type = db_query("select field_su_rsvp_t_option_type_value from {field_data_field_su_rsvp_t_option_type} where entity_id = :oid", array(':oid' => $oid))->fetchField();
   if ($type) {
     return $type;
   } else {
@@ -762,7 +762,7 @@ function stanford_rsvp_menu() {
 function stanford_rsvp_attendees_page_access($node) {
   global $user;
 
-  if (($node->type === 'event') &&
+  if (($node->type === 'stanford_rsvp') &&
       user_is_logged_in() &&
       stanford_rsvp_user_can_administer($user, $node)) {
     return true;
@@ -780,8 +780,8 @@ function stanford_rsvp_attendees_page_access($node) {
  */
 
 function stanford_rsvp_user_can_administer($user, $node) {
-  $event_admin_role = user_role_load_by_name('Event Admin');
-  if (user_has_role($event_admin_role->rid, $user)) {
+  $rsvp_admin_role = user_role_load_by_name('RSVP Admin');
+  if (user_has_role($rsvp_admin_role->rid, $user)) {
     return true;
   }
   if ($user->uid === $node->uid) {
