@@ -1,8 +1,0 @@
-<?php
-
-/**
- * @file
- * Code for the Event Feature feature.
- */
-
-include_once 'event_feature.features.inc';
