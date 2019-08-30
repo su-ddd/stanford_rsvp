@@ -1,0 +1,8 @@
+<?php
+
+/**
+ * @file
+ * Code for the Stanford RSVP feature.
+ */
+
+include_once 'stanford_rsvp_content_type.features.inc';
