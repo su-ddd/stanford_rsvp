@@ -1,0 +1,40 @@
+/* Button */
+
+a.btn-success {
+  background-color: #28a745;
+  border: 1px solid #28a745;
+  border-radius: .3rem;
+  box-sizing: border-box;
+  color: #fff;
+  cursor: pointer;
+  display: inline-block;
+  font-size: 1.5rem;
+  font-weight: 300;
+  line-height: 1.5;
+  padding: .5rem 1rem;
+  text-align: center;
+  text-decoration: none;
+  transition: color .15s ease-in-out, background-color .15s ease-in-out, border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+  user-select: none;
+  vertical-align: middle;
+  white-space: nowrap;
+  width: 100%;
+}
+
+a.btn-success:hover,
+a.btn-success:focus {
+  background-color: #218838;
+  border-color: #1e7e34;
+}
+
+.btn-danger {
+    color: #fff;
+    background: none !important;
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+}
+
+.btn {
+  margin-right: .5em;
+}
+
