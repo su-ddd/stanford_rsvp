@@ -199,7 +199,7 @@ function stanford_rsvp_rsvp_form($form, $form_state, $args) {
   if ($current_option)  {
     if (stanford_rsvp_get_ticket_type($current_option) != 'cancel') {
       $form['cancel'] = array(
-        '#attributes' => array('class' => array('btn', 'btn-danger')),
+        '#attributes' => array('class' => array('btn', 'btn-cancel')),
         '#type' => 'submit',
         '#value' => t('Cancel'),
         '#submit' => array('stanford_rsvp_rsvp_form_cancel'),

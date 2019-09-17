@@ -1,7 +1,7 @@
 /* Button */
 
-.btn-danger {
-    color: #fff;
+.btn-cancel {
+    color: #fff !important;
     background: none !important;
     background-color: #dc3545 !important;
     border-color: #dc3545 !important;
