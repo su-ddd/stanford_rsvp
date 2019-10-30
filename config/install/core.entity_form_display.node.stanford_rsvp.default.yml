@@ -1,0 +1,122 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.field.node.stanford_rsvp.field_stanford_rsvp_date
+    - field.field.node.stanford_rsvp.field_stanford_rsvp_info_url
+    - field.field.node.stanford_rsvp.field_stanford_rsvp_location
+    - field.field.node.stanford_rsvp.field_stanford_rsvp_max
+    - field.field.node.stanford_rsvp.field_stanford_rsvp_text
+    - field.field.node.stanford_rsvp.field_stanford_rsvp_zoom_id
+    - node.type.stanford_rsvp
+  module:
+    - datetime_range
+    - link
+    - path
+    - text
+id: node.stanford_rsvp.default
+targetEntityType: node
+bundle: stanford_rsvp
+mode: default
+content:
+  created:
+    type: datetime_timestamp
+    weight: 10
+    region: content
+    settings: {  }
+    third_party_settings: {  }
+  field_stanford_rsvp_date:
+    weight: 125
+    settings: {  }
+    third_party_settings: {  }
+    type: daterange_default
+    region: content
+  field_stanford_rsvp_info_url:
+    weight: 123
+    settings:
+      placeholder_url: ''
+      placeholder_title: ''
+    third_party_settings: {  }
+    type: link_default
+    region: content
+  field_stanford_rsvp_location:
+    weight: 121
+    settings:
+      size: 60
+      placeholder: ''
+    third_party_settings: {  }
+    type: string_textfield
+    region: content
+  field_stanford_rsvp_max:
+    weight: 127
+    settings:
+      placeholder: ''
+    third_party_settings: {  }
+    type: number
+    region: content
+  field_stanford_rsvp_text:
+    weight: 124
+    settings:
+      rows: 5
+      placeholder: ''
+    third_party_settings: {  }
+    type: text_textarea
+    region: content
+  field_stanford_rsvp_zoom_id:
+    weight: 122
+    settings:
+      size: 60
+      placeholder: ''
+    third_party_settings: {  }
+    type: string_textfield
+    region: content
+  path:
+    type: path
+    weight: 30
+    region: content
+    settings: {  }
+    third_party_settings: {  }
+  promote:
+    type: boolean_checkbox
+    settings:
+      display_label: true
+    weight: 15
+    region: content
+    third_party_settings: {  }
+  status:
+    type: boolean_checkbox
+    settings:
+      display_label: true
+    weight: 120
+    region: content
+    third_party_settings: {  }
+  sticky:
+    type: boolean_checkbox
+    settings:
+      display_label: true
+    weight: 16
+    region: content
+    third_party_settings: {  }
+  title:
+    type: string_textfield
+    weight: -5
+    region: content
+    settings:
+      size: 60
+      placeholder: ''
+    third_party_settings: {  }
+  uid:
+    type: entity_reference_autocomplete
+    weight: 5
+    settings:
+      match_operator: CONTAINS
+      size: 60
+      placeholder: ''
+    region: content
+    third_party_settings: {  }
+  url_redirects:
+    weight: 50
+    settings: {  }
+    third_party_settings: {  }
+    region: content
+hidden: {  }

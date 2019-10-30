@@ -1,0 +1,22 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_stanford_rsvp_info_url
+    - node.type.stanford_rsvp
+  module:
+    - link
+id: node.stanford_rsvp.field_stanford_rsvp_info_url
+field_name: field_stanford_rsvp_info_url
+entity_type: node
+bundle: stanford_rsvp
+label: 'Information URL'
+description: 'URL to send people for more information about the event and to change their RSVP.'
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings:
+  link_type: 17
+  title: 0
+field_type: link

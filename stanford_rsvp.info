@@ -1,5 +1,0 @@
-name        = Stanford RSVP
-description = Handles RSVPs for free Stanford events
-core        = 7.x
-package = Stanford
-version     = 7.x-1.0-dev

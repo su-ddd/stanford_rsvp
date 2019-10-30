@@ -1,0 +1,22 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_stanford_rsvp_max
+    - node.type.stanford_rsvp
+id: node.stanford_rsvp.field_stanford_rsvp_max
+field_name: field_stanford_rsvp_max
+entity_type: node
+bundle: stanford_rsvp
+label: 'Max Attendees'
+description: 'Specify the total number of tickets or attendees for this date. This is across all attendee types. Leave empty for no limit.'
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings:
+  min: null
+  max: null
+  prefix: ''
+  suffix: ''
+field_type: integer

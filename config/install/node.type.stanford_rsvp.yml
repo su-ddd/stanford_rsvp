@@ -1,0 +1,13 @@
+langcode: en
+status: true
+dependencies:
+  enforced:
+    module:
+    - stanford_rsvp
+name: 'Stanford RSVP'
+type: stanford_rsvp
+description: 'Stanford RSVP'
+help: 'Use <em>Stanford RSVP</em> to create a registration for an event.'
+new_revision: true
+preview_mode: 0
+display_submitted: false

@@ -1,0 +1,20 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_stanford_rsvp_text
+    - node.type.stanford_rsvp
+  module:
+    - text
+id: node.stanford_rsvp.field_stanford_rsvp_text
+field_name: field_stanford_rsvp_text
+entity_type: node
+bundle: stanford_rsvp
+label: 'RSVP Invitation Text'
+description: ''
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings: {  }
+field_type: text_long

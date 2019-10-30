@@ -1,5 +1,4 @@
 <?php
-
 define("REGISTERED", 1);
 define("WAITLISTED", 2);
 define("CANCELLED", 3);

@@ -1,0 +1,20 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_stanford_rsvp_date
+    - node.type.stanford_rsvp
+  module:
+    - datetime_range
+id: node.stanford_rsvp.field_stanford_rsvp_date
+field_name: field_stanford_rsvp_date
+entity_type: node
+bundle: stanford_rsvp
+label: Date
+description: ''
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings: {  }
+field_type: daterange
