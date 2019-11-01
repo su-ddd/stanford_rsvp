@@ -1,0 +1,6 @@
+name: 'Stanford RSVP - Ticket field'
+description: 'Helper module to Stanford RSVP - Provides the ticket field type'
+type: module
+core: 8.x
+package: Stanford
+version: 8.x-1.0-dev

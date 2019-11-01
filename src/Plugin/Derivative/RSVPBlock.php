@@ -49,7 +49,7 @@ class RSVPBlock extends DeriverBase implements ContainerDeriverInterface {
    * {@inheritdoc}
    */
   public function getDerivativeDefinitions($base_plugin_definition) {
-    $nodes = $this->nodeStorage->loadByProperties(['type' => 'article']);
+    $nodes = $this->nodeStorage->loadByProperties(['type' => 'stanford_rsvp']);
     foreach ($nodes as $node) {
       $this->derivatives[$node->id()] = $base_plugin_definition;
       $this->derivatives[$node->id()]['admin_label'] = t('RSVP block: ') . $node->label();

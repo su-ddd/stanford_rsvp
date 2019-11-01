@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\stanford_rsvp\Plugin\Field\FieldType;
+namespace Drupal\stanford_rsvp_ticket\Plugin\Field\FieldType;
 
 use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\Form\FormStateInterface;
@@ -46,8 +46,8 @@ class StanfordRSVPTicket extends FieldItemBase implements FieldItemInterface {
     );
 
     $output['columns']['ticket_type'] = array(
-      'type' => 'int',
-      'length' => 1,
+      'type' => 'varchar',
+      'length' => 255,
     );
 
     return $output;
@@ -70,7 +70,7 @@ class StanfordRSVPTicket extends FieldItemBase implements FieldItemInterface {
       ->setLabel(t('Max Attendees'))
       ->setRequired(FALSE);
 
-    $properties['ticket_type'] = DataDefinition::create('boolean')
+    $properties['ticket_type'] = DataDefinition::create('string')
       ->setLabel(t('Type of Option'))
       ->setRequired(FALSE);
 

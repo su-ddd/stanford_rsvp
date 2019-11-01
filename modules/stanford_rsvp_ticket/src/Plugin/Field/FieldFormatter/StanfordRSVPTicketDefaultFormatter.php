@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\stanford_rsvp\Plugin\Field\FieldFormatter;
+namespace Drupal\stanford_rsvp_ticket\Plugin\Field\FieldFormatter;
 
 use Drupal\Core\Field\FormatterBase;
 use Drupal\Core\Field\FieldItemListInterface;

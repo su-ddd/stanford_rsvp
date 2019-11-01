@@ -1,0 +1,20 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_stanford_rsvp_ticket_types
+    - node.type.stanford_rsvp
+  module:
+    - stanford_rsvp_ticket
+id: node.stanford_rsvp.field_stanford_rsvp_ticket_types
+field_name: field_stanford_rsvp_ticket_types
+entity_type: node
+bundle: stanford_rsvp
+label: 'Ticket Types'
+description: 'Enter the types of tickets (e.g. In Person, In Zoom, etc.).'
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings: {  }
+field_type: stanford_rsvp_ticket

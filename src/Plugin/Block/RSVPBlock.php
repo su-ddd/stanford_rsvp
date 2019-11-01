@@ -66,7 +66,30 @@ class RSVPBlock extends BlockBase implements ContainerFactoryPluginInterface {
     if (!$this->node instanceof NodeInterface) {
       return;
     }
-    $build = $this->viewBuilder->view($this->node, 'full');
+    $location = $this->node->get('field_stanford_rsvp_location')->getString();
+    $zoom_id  = $this->node->get('field_stanford_rsvp_zoom_id')->getString();
+    $info_url = $this->node->get('field_stanford_rsvp_info_url')->getString();
+    $max      = $this->node->get('field_stanford_rsvp_max')->getString();
+    $text     = $this->node->get('field_stanford_rsvp_text')->getValue();
+    $date     = $this->node->get('field_stanford_rsvp_date')->getValue();
+    $tickets  = $this->node->get('field_stanford_rsvp_ticket_types')->getValue();
+    $user     = \Drupal::currentUser();
+
+    $block_content = '';
+    if ($user->isAuthenticated()) {
+      $block_content = 'user is logged in';
+    } else {
+        $block_content .= '<p>' . t('Please log in to register.') . '</p>'; 
+        $login_url = \Drupal\Core\Url::fromRoute('simplesamlphp_auth.saml_login');
+        $login_url->setOptions(array('attributes' => array('class' => array('btn success'))));
+        $login_url->setOptions(array('query' => \Drupal::service('redirect.destination')->getAsArray()));
+        $block_content .= \Drupal\Core\Link::fromTextAndUrl('Log in', $login_url)->toString();
+    }
+
+//    $block_content = $location . ' ' . $zoom_id . ' ' . $info_url . ' ' . $rsvp_max . ' ' . print_r($text, true) . ' ' . print_r($date, true) . ' ' . print_r($tickets, true) . ' ' . print_r($user, true));
+    $build = array('#markup' => $block_content);
+
+//$this->node->get('field_stanford_rsvp_location')->getString()); //'hello'); //$this->viewBuilder->view($this->node, 'full');
     return $build;
   }
   
@@ -75,5 +98,9 @@ class RSVPBlock extends BlockBase implements ContainerFactoryPluginInterface {
    */
   public function blockAccess(AccountInterface $account, $return_as_object = FALSE) {
     return $this->node->access('view', NULL, TRUE);
+  }
+
+  public function getCacheMaxAge() {
+    return 0;
   }
 }

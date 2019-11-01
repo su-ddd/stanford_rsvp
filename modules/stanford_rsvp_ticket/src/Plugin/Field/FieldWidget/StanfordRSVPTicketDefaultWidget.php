@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\stanford_rsvp\Plugin\Field\FieldWidget;
+namespace Drupal\stanford_rsvp_ticket\Plugin\Field\FieldWidget;
 
 use Drupal\Core\Field\WidgetBase;
 use Drupal\Core\Field\WidgetInterface;

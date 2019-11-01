@@ -8,6 +8,7 @@ dependencies:
     - field.field.node.stanford_rsvp.field_stanford_rsvp_max
     - field.field.node.stanford_rsvp.field_stanford_rsvp_text
     - field.field.node.stanford_rsvp.field_stanford_rsvp_zoom_id
+    - field.field.node.stanford_rsvp.field_stanford_rsvp_ticket_types
     - node.type.stanford_rsvp
   module:
     - datetime_range
@@ -69,6 +70,12 @@ content:
       placeholder: ''
     third_party_settings: {  }
     type: string_textfield
+    region: content
+  field_stanford_rsvp_ticket_types:
+    weight: 128
+    settings: {  }
+    third_party_settings: {  }
+    type: stanford_rsvp_ticket_default
     region: content
   path:
     type: path

@@ -1,0 +1,21 @@
+langcode: en
+status: true
+dependencies:
+  enforced:
+    module:
+      - stanford_rsvp
+      - stanford_rsvp_ticket
+  module:
+    - node
+id: node.field_stanford_rsvp_ticket_types
+field_name: field_stanford_rsvp_ticket_types
+entity_type: node
+type: stanford_rsvp_ticket
+settings: { }
+module: stanford_rsvp_ticket
+locked: false
+cardinality: -1
+translatable: true
+indexes: {  }
+persist_with_no_fields: false
+custom_storage: false
