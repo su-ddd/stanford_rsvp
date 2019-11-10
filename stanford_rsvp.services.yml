@@ -1,0 +1,7 @@
+services:
+  stanford_rsvp.uninstall_validator:
+    class: Drupal\stanford_rsvp\StanfordRSVPUninstallValidator
+    tags:
+      - { name: module_install.uninstall_validator }
+    arguments: ['@entity.query']
+    lazy: true
