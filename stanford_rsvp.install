@@ -32,26 +32,19 @@ function stanford_rsvp_schema() {
       'unsigned' => TRUE,
       'not null' => TRUE,
     ),
-    'eid' => array(
-      'description' => 'The RSVP event id.',
+    'nid' => array(
+      'description' => 'The RSVP event / node id.',
       'type' => 'int',
       'unsigned' => TRUE,
       'not null' => TRUE,
       'default' => 0,
     ),
-    'did' => array(
-      'description' => 'The RSVP date id.',
-      'type' => 'int',
-      'unsigned' => TRUE,
+    'tid' => array(
+      'description' => 'The id of the RSVP ticket option selected by the user (uuid).',
+      'type' => 'varchar',
+      'length' => 128,
       'not null' => TRUE,
-      'default' => 0,
-    ),
-    'oid' => array(
-      'description' => 'The RSVP option id.',
-      'type' => 'int',
-      'unsigned' => TRUE,
-      'not null' => TRUE,
-      'default' => 0,
+      'default' => '',
     ),
     'uid' => array(
       'description' => 'The {users}.uid that submitted the RSVP.',
@@ -60,7 +53,7 @@ function stanford_rsvp_schema() {
       'not null' => TRUE,
     ),
     'status' => array(
-      'description' => 'Registration status, registered 1 or waitlisted 2',
+      'description' => 'Registration status, registered (1), waitlisted (2) or cancelled (3)',
       'type' => 'int',
       'unsigned' => TRUE,
       'not null' => TRUE,
@@ -72,9 +65,9 @@ function stanford_rsvp_schema() {
       'default' => 0),
     ),
     'indexes' => array(
-      'oid' => array('oid'),
+      'nid' => array('nid'),
       'uid' => array('uid'),
-      'did' => array('did'),
+      'tid' => array('tid'),
     ),
     'primary key' => array('id'),
   );
