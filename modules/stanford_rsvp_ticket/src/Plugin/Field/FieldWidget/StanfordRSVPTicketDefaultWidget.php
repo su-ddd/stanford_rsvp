@@ -83,22 +83,14 @@ class StanfordRSVPTicketDefaultWidget extends WidgetBase implements WidgetInterf
       '#default_value' => isset($item->ticket_type) ? $item->ticket_type : '',
     );
 
-    return $element;
+    $uuid = \Drupal::service('uuid');
+    $new_uuid = $uuid->generate();
 
-  }
-
-  /**
-   * Form widget process callback.
-   */
-/*
-  public static function processToppingsFieldset($element, FormStateInterface $form_state, array $form) {
-
-    // The last fragment of the name, i.e. meat|toppings is not required
-    // for structuring of values.
-    $elem_key = array_pop($element['#parents']);
+    $element['uuid'] = array(
+      '#type' => 'hidden',
+      '#default_value' => isset($item->uuid) ? $item->uuid : $new_uuid,
+    );
 
     return $element;
-
   }
-*/
 }

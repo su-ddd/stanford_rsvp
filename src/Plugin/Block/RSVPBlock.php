@@ -77,7 +77,9 @@ class RSVPBlock extends BlockBase implements ContainerFactoryPluginInterface {
 
     $block_content = '';
     if ($user->isAuthenticated()) {
-      $block_content = 'user is logged in';
+      // test if the user has an RSVP
+      // build form for RSVP
+      $block_content .= print_r($tickets, true);
     } else {
         $block_content .= '<p>' . t('Please log in to register.') . '</p>'; 
         $login_url = \Drupal\Core\Url::fromRoute('simplesamlphp_auth.saml_login');

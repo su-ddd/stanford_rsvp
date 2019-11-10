@@ -50,6 +50,11 @@ class StanfordRSVPTicket extends FieldItemBase implements FieldItemInterface {
       'length' => 255,
     );
 
+    $output['columns']['uuid'] = array(
+      'type' => 'varchar',
+      'length' => 128,
+    );
+
     return $output;
   }
 
@@ -72,7 +77,11 @@ class StanfordRSVPTicket extends FieldItemBase implements FieldItemInterface {
 
     $properties['ticket_type'] = DataDefinition::create('string')
       ->setLabel(t('Type of Option'))
-      ->setRequired(FALSE);
+      ->setRequired(TRUE);
+
+    $properties['uuid'] = DataDefinition::create('string')
+      ->setLabel(t('Unique ID'))
+      ->setRequired(TRUE);
 
     return $properties;
   }
