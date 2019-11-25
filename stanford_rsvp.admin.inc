@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Administration for the ServiceNow KB Module
+ * Stanford RSVP module Admin Pages
  *
  */
 
@@ -13,12 +13,13 @@ function stanford_rsvp_attendees_page($form, &$form_state, $node) {
   foreach ($event->dates as $date) {
     $content .= '<h2>' . $date->name . '</h2>';
     foreach ($date->options as $option_id => $option_name) {
-      $content .= '<h3>' . $option_name . '</h3>';
       if (stanford_rsvp_get_ticket_type($option_id) == 'cancel') {
         $rsvps = stanford_rsvp_rsvps($option_id, STANFORD_RSVP_CANCELLED);
       } else {
         $rsvps = stanford_rsvp_rsvps($option_id, STANFORD_RSVP_REGISTERED);
       }
+      $total_rsvps = count($rsvps);
+      $content .= '<h3>' . $option_name . ' (' . $total_rsvps . ')</h3>';
 
       $rows = array();
       foreach ($rsvps as $rsvp) {
