@@ -8,6 +8,7 @@ use Drupal\Core\Entity\EntityViewBuilderInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\node\NodeInterface;
+use Drupal\Core\Form\FormInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -89,10 +90,14 @@ class RSVPBlock extends BlockBase implements ContainerFactoryPluginInterface {
     }
 
 //    $block_content = $location . ' ' . $zoom_id . ' ' . $info_url . ' ' . $rsvp_max . ' ' . print_r($text, true) . ' ' . print_r($date, true) . ' ' . print_r($tickets, true) . ' ' . print_r($user, true));
-    $build = array('#markup' => $block_content);
 
 //$this->node->get('field_stanford_rsvp_location')->getString()); //'hello'); //$this->viewBuilder->view($this->node, 'full');
-    return $build;
+
+    $form = \Drupal::formBuilder()->getForm('Drupal\stanford_rsvp\Form\StanfordRSVPForm', $this->node);
+    $block_content .= $form;
+    $build = array('#markup' => $block_content);
+    return $form;
+//    return $build;
   }
   
   /**
