@@ -88,8 +88,9 @@ class StanfordRsvpUserRsvp {
     }
   }
 
+  // look inside the stanford_rsvp_rsvps for an entry with this user and event
+
   public function getRsvp() {
-    // look inside the stanford_rsvp_rsvps for an entry with this user and event
     $database = \Drupal::database();
     $query = $database->select('stanford_rsvp_rsvps', 'srr');
     $query->addField('srr', 'tid');
@@ -98,5 +99,18 @@ class StanfordRsvpUserRsvp {
     $result = $query->execute();
     $record = $result->fetchField();
     return $record;
+  }
+
+  // update the RSVP 
+  public function setRsvp($ticket_id) {
+    $database = \Drupal::database();
+    $database->merge('stanford_rsvp_rsvps')
+	->key('uid', $this->user->id())
+	->key('nid', $this->node->id())
+	->fields([
+		'tid' => $ticket_id,
+                'created' => REQUEST_TIME,
+		])
+	->execute();
   }
 }

@@ -133,19 +133,22 @@ class StanfordRSVPForm extends FormBase {
     // if the option chosen is a cancel option
     if ($new_option->ticket_type == 'cancel') {
       dsm('you have chosen a cancel option');
+      // if the user had something selected before
+      // send a notification that they cancelled
+      // cancel registration
     }
 
     dsm($new_option->totalRegistrations());
 
-      // save the option
-      // if the user had something selected before
-        // send a notification that they cancelled
-    // if there are spaces available
+    // Check to see if there are any spaces available for the option chosen.
 
     if ($new_option->hasSpaceAvailable()) {
       dsm('there is room');
+      $this->current_rsvp->setRsvp($new_option_id);
+      // TODO: update registration
     } else {
       dsm('there is no room');
+      // TODO: return error message
     }
       // update the rsvp
       // call the webhook
