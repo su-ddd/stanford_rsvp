@@ -29,12 +29,34 @@ class StanfordRsvp {
    * Determines if the event still has spaces available
    *
    * @return bool
-   *   TRUE if there are still spaces available, FALSE otherwise.
+   *   TRUE if there are still spaces available or there is no maximum set,
+   #   FALSE otherwise.
    */
   public function hasSpacesAvailable() {
-    // TODO:
-    // Find the maximum number for the entire event
-    // Find the total number of all registered users for all options 
-    return TRUE;
+    $max = $this->node->get('field_stanford_rsvp_max')->getString();
+    if (empty($max)) {
+      return TRUE;
+    } else {
+
+      $total_registrations = 0;
+      $ticket_types = $this->getTicketTypes();
+      foreach ($ticket_types as $ticket_type) {
+        if ($ticket_type['ticket_type'] != 'cancel') {
+          $ticket = new StanfordRsvpTicketType($this->node, $ticket_type['uuid']);
+          $total_registrations = $total_registrations + $ticket->totalRegistrations();
+        }
+      }
+
+      if ($max > $total_registrations) {
+        return TRUE;
+      } else {
+        return FALSE;
+      }
+    }
+  }
+
+  public function getTicketTypes() {
+    $ticket_types  = $this->node->get('field_stanford_rsvp_ticket_types')->getValue();
+    return $ticket_types;
   }
 }

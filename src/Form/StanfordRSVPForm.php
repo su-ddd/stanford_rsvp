@@ -51,7 +51,13 @@ class StanfordRSVPForm extends FormBase {
     $rsvp_options = array();
 
     foreach ($tickets as $rsvp_option) {
+      // if there is room available
       $rsvp_options[$rsvp_option['uuid']] = $rsvp_option['name'];
+      // else
+      // if there is a waitlist
+      // $rsvp_options[$rsvp_option['uuid']] = $rsvp_option['name'] . ' - WAITLIST';
+      // else
+      // $rsvp_options[$rsvp_option['uuid']] = $rsvp_option['name'] . ' - FULL';
     }
 
     if ($this->current_rsvp->hasRsvp()) {
