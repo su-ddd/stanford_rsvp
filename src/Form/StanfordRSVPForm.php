@@ -9,7 +9,7 @@ namespace Drupal\stanford_rsvp\Form;
 
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\stanford_rsvp\StanfordRsvp;
+use Drupal\stanford_rsvp\StanfordRsvpEvent;
 use Drupal\stanford_rsvp\StanfordRsvpUserRsvp;
 use Drupal\stanford_rsvp\StanfordRsvpTicketType;
 
@@ -32,7 +32,9 @@ class StanfordRSVPForm extends FormBase {
   public function buildForm(array $form, FormStateInterface $form_state, $node = NULL) {
 
     $this->node  = $node;
-    $this->event = new StanfordRsvp($node);
+    $this->event = new StanfordRsvpEvent($node);
+
+    dsm($this->event->debug());
 
     $user     = \Drupal::currentUser();
     $this->current_rsvp = new StanfordRsvpUserRsvp($node, $user);
@@ -129,7 +131,7 @@ class StanfordRSVPForm extends FormBase {
     }
 
     // load the ticket option
-    $new_option = new StanfordRsvpTicketType($this->node, $new_option_id);
+    $new_option = $this->event->getTicketType($new_option_id);
 
     // if the option chosen doesn't exist, do nothing
     if (!($new_option->ticket_found)) {
@@ -144,7 +146,7 @@ class StanfordRSVPForm extends FormBase {
       // cancel registration
     }
 
-    dsm($new_option->totalRegistrations());
+    dsm($new_option->countTotalRegistrations());
 
     // Check to see if there are any spaces available for the option chosen.
 
