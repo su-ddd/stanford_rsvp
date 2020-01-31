@@ -14,6 +14,7 @@ class StanfordRsvpEvent {
    * @var \Drupal\Core\Entity\Node
    */
   protected $node;
+  public $id;
   public $max;
   public $name;
   public $location;
@@ -37,6 +38,7 @@ class StanfordRsvpEvent {
     // TODO: is this node of type RSVP?
 
     $this->node     = $node;
+    $this->id       = $node->id();
     $this->max      = $this->node->get('field_stanford_rsvp_max')->getString();
     $this->name     = $this->node->getTitle();
     $this->location = $this->node->get('field_stanford_rsvp_location')->getString();
@@ -56,7 +58,7 @@ class StanfordRsvpEvent {
 
   public function getTicket($ticket_id) {
     foreach ($this->tickets as $ticket) {
-      if ($ticket->ticket_id == $ticket_id) {
+      if ($ticket->id == $ticket_id) {
         return $ticket;
       }
     }

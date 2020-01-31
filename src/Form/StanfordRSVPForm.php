@@ -37,11 +37,11 @@ class StanfordRSVPForm extends FormBase {
     dsm($this->event->debug());
 
     $user     = \Drupal::currentUser();
-    $this->current_rsvp = new StanfordRsvpUserRsvp($node, $user);
+    $this->current_rsvp = new StanfordRsvpUserRsvp($this->event, $user);
 
     $current_option = '';
     if ($this->current_rsvp->hasRsvp()) {
-      $current_option = $this->current_rsvp->getTicketId();
+      $current_option = $this->current_rsvp->ticket->id;
     }
 
     if ($this->event->hasSpacesAvailable()) {
@@ -53,24 +53,33 @@ class StanfordRSVPForm extends FormBase {
     $rsvp_options = array();
 
     foreach ($tickets as $ticket) {
-      // if there is room available
-      // or, the type of ticket is 'cancel'
-      // or, the ticket is the one the user is already signed up for
       if ($ticket->hasSpaceAvailable() ||
          ($ticket->ticket_type == 'cancel') ||
-         ($ticket->ticket_id == $current_option)) {
-        $rsvp_options[$ticket->ticket_id] = $ticket->name;
+         ($ticket->id == $current_option)) {
+        $rsvp_options[$ticket->id] = $ticket->name;
       } else {
         if ($ticket->hasWaitlistAvailable()) {
-          $rsvp_options[$ticket->ticket_id] = $ticket->name . t('- WAITLIST');
+          $rsvp_options[$ticket->id] = $ticket->name . t('- WAITLIST');
         } else {
-          $rsvp_options[$ticket->ticket_id] = $ticket->name . t('- FULL');
+          $rsvp_options[$ticket->id] = $ticket->name . t('- FULL');
         }
       }
     }
 
+    // Print out the logged-in user's current status (registered, waitlisted or none)
     if ($this->current_rsvp->hasRsvp()) {
-      $form['status']['#markup'] = '<p>' . t('Your current selection is:') . '<br /><em>' . $this->current_rsvp->getTicketName() . '</em></p>';
+
+      $status_text = t('Your current selection is:');
+
+      if ($this->current_rsvp->status == 1) {
+        $status_text = t('You are currently <strong>registered</strong> for:');
+      }
+
+      if ($this->current_rsvp->status == 2) {
+        $status_text = t('You are currently <strong>waitlisted</strong> for:');
+      }
+
+      $form['status']['#markup'] = '<p>' . $status_text . '<br /><em>' . $this->current_rsvp->ticket->name . '</em></p>';
     } else {
       $form['status']['#markup'] = '<p>' . t('You haven&rsquo;t RSVP&rsquo;ed yet.') . '</p>';
     }

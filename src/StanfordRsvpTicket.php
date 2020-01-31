@@ -15,7 +15,7 @@ class StanfordRsvpTicket {
    */
   protected $node;
 
-  public $ticket_id;
+  public $id;
   public $ticket_name;
   public $max_attendees;
   public $total_attendees;
@@ -32,7 +32,7 @@ class StanfordRsvpTicket {
    */
 
   public function __construct($ticket) {
-    $this->ticket_id = $ticket['uuid'];
+    $this->id = $ticket['uuid'];
     $this->name      = $ticket['name'];
     $this->max_attendees = $ticket['max_attendees'];
     $this->total_attendees = $this->countTotalRegistrations();
@@ -50,7 +50,7 @@ class StanfordRsvpTicket {
   public function countTotalRegistrations() {
     $database = \Drupal::database();
     $query = $database->select('stanford_rsvp_rsvps', 'srr');
-    $query->condition('srr.tid', $this->ticket_id, '=');
+    $query->condition('srr.tid', $this->id, '=');
     $query->condition('srr.status', 1, '=');
     $num_rows = $query->countQuery()->execute()->fetchField();
     return $num_rows;
@@ -59,7 +59,7 @@ class StanfordRsvpTicket {
   public function countTotalWaitlisted() {
     $database = \Drupal::database();
     $query = $database->select('stanford_rsvp_rsvps', 'srr');
-    $query->condition('srr.tid', $this->ticket_id, '=');
+    $query->condition('srr.tid', $this->id, '=');
     $query->condition('srr.status', 2, '=');
     $num_rows = $query->countQuery()->execute()->fetchField();
     return $num_rows;
@@ -100,7 +100,7 @@ class StanfordRsvpTicket {
     $ticket_types  = $this->node->get('field_stanford_rsvp_ticket_types')->getValue();
 
     // find the position of the ticket type with the current ticket ID (a uuid)
-    $key = array_search($this->ticket_id, array_column($ticket_types, 'uuid'));
+    $key = array_search($this->id, array_column($ticket_types, 'uuid'));
 
     // if we've found a position, fill in the details 
     if ($key !== FALSE) {
