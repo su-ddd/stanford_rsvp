@@ -6,7 +6,7 @@ namespace Drupal\stanford_rsvp;
  * A ticket type associated with a particular Stanford RSVP Event
  */
 
-class StanfordRsvpTicketType {
+class StanfordRsvpTicket {
 
   /**
    * The node on which this is built.
@@ -25,7 +25,7 @@ class StanfordRsvpTicketType {
   public $ticket_found = FALSE;
 
   /**
-   * Constructs a new StanfordRsvpTicketType.
+   * Constructs a new StanfordRsvpTicket.
    *
    * @param array $ticket
    *   The values for this ticket type
@@ -69,8 +69,20 @@ class StanfordRsvpTicketType {
     // if there is no max, or there are fewer registrations than the max
     // there is still space. If not, there isn't.
     if ((!isset($this->max_attendees)) ||
-        (empty($this->max_attendees)) ||
+        ((empty($this->max_attendees)) && ($this->max_attendees != 0)) ||
         ($this->total_attendees < $this->max_attendees)) {
+      return TRUE;
+    } else {
+      return FALSE;
+    }
+  }
+
+  public function hasWaitlistAvailable() {
+    // if there is no max, or there are fewer registrations than the max
+    // there is still space. If not, there isn't.
+    if ((!isset($this->max_waitlist)) ||
+        ((empty($this->max_waitlist)) && ($this->max_waitlist != 0)) ||
+        ($this->total_waitlist < $this->max_waitlist)) {
       return TRUE;
     } else {
       return FALSE;

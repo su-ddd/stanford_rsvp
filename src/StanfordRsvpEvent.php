@@ -22,9 +22,8 @@ class StanfordRsvpEvent {
   public $text;
   public $start_date;
   public $end_date;
-  public $ticket_tickets;
+  public $tickets;
 
-  // ticket types
   // published (is live?)
 
   /**
@@ -47,17 +46,18 @@ class StanfordRsvpEvent {
     $this->start_date = $this->node->field_stanford_rsvp_date->get(0)->start_date;
     $this->end_date   = $this->node->field_stanford_rsvp_date->get(0)->end_date;
 
+    $tickets = array();
+
     // load the tickets from the DB
-    $tickets  = $this->node->get('field_stanford_rsvp_ticket_types')->getValue();
-    foreach ($tickets as $ticket) {
-        $this->ticket_types[] = new StanfordRsvpTicketType($ticket);
+    foreach ($this->node->get('field_stanford_rsvp_ticket_types')->getValue() as $ticket) {
+        $this->tickets[] = new StanfordRsvpTicket($ticket);
     }
   }
 
-  public function getTicketType($ticket_id) {
-    foreach ($this->ticket_types as $ticket_type) {
-      if ($ticket_type->ticket_id == $ticket_id) {
-        return $ticket_type;
+  public function getTicket($ticket_id) {
+    foreach ($this->tickets as $ticket) {
+      if ($ticket->ticket_id == $ticket_id) {
+        return $ticket;
       }
     }
   }

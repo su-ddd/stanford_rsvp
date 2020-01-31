@@ -11,7 +11,7 @@ use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\stanford_rsvp\StanfordRsvpEvent;
 use Drupal\stanford_rsvp\StanfordRsvpUserRsvp;
-use Drupal\stanford_rsvp\StanfordRsvpTicketType;
+use Drupal\stanford_rsvp\StanfordRsvpTicket;
 
 class StanfordRSVPForm extends FormBase {
   /**
@@ -48,18 +48,25 @@ class StanfordRSVPForm extends FormBase {
     }
 
 
-    $tickets  = $node->get('field_stanford_rsvp_ticket_types')->getValue();
+    $tickets  = $this->event->tickets;
 
     $rsvp_options = array();
 
-    foreach ($tickets as $rsvp_option) {
+    foreach ($tickets as $ticket) {
       // if there is room available
-      $rsvp_options[$rsvp_option['uuid']] = $rsvp_option['name'];
-      // else
-      // if there is a waitlist
-      // $rsvp_options[$rsvp_option['uuid']] = $rsvp_option['name'] . ' - WAITLIST';
-      // else
-      // $rsvp_options[$rsvp_option['uuid']] = $rsvp_option['name'] . ' - FULL';
+      // or, the type of ticket is 'cancel'
+      // or, the ticket is the one the user is already signed up for
+      if ($ticket->hasSpaceAvailable() ||
+         ($ticket->ticket_type == 'cancel') ||
+         ($ticket->ticket_id == $current_option)) {
+        $rsvp_options[$ticket->ticket_id] = $ticket->name;
+      } else {
+        if ($ticket->hasWaitlistAvailable()) {
+          $rsvp_options[$ticket->ticket_id] = $ticket->name . t('- WAITLIST');
+        } else {
+          $rsvp_options[$ticket->ticket_id] = $ticket->name . t('- FULL');
+        }
+      }
     }
 
     if ($this->current_rsvp->hasRsvp()) {
@@ -131,7 +138,7 @@ class StanfordRSVPForm extends FormBase {
     }
 
     // load the ticket option
-    $new_option = $this->event->getTicketType($new_option_id);
+    $new_option = $this->event->getTicket($new_option_id);
 
     // if the option chosen doesn't exist, do nothing
     if (!($new_option->ticket_found)) {
