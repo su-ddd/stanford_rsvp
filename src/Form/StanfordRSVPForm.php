@@ -59,9 +59,9 @@ class StanfordRSVPForm extends FormBase {
         $rsvp_options[$ticket->id] = $ticket->name;
       } else {
         if ($ticket->hasWaitlistAvailable()) {
-          $rsvp_options[$ticket->id] = $ticket->name . t('- WAITLIST');
+          $rsvp_options[$ticket->id] = $ticket->name . t(' - WAITLIST');
         } else {
-          $rsvp_options[$ticket->id] = $ticket->name . t('- FULL');
+          $rsvp_options[$ticket->id] = $ticket->name . t(' - FULL');
         }
       }
     }
@@ -71,11 +71,11 @@ class StanfordRSVPForm extends FormBase {
 
       $status_text = t('Your current selection is:');
 
-      if ($this->current_rsvp->status == 1) {
+      if ($this->current_rsvp->status == REGISTERED) {
         $status_text = t('You are currently <strong>registered</strong> for:');
       }
 
-      if ($this->current_rsvp->status == 2) {
+      if ($this->current_rsvp->status == WAITLISTED) {
         $status_text = t('You are currently <strong>waitlisted</strong> for:');
       }
 
@@ -138,7 +138,7 @@ class StanfordRSVPForm extends FormBase {
       return;
     }
 
-    $old_option_id = $this->current_rsvp->getTicketId();
+    $old_option_id = $this->current_rsvp->ticket->id;
 
     // if the chosen option is the same as the current one, do nothing
     if ($new_option_id == $old_option_id) {
@@ -167,9 +167,10 @@ class StanfordRSVPForm extends FormBase {
     // Check to see if there are any spaces available for the option chosen.
 
     if ($new_option->hasSpaceAvailable()) {
-      dsm('there is room');
-      $this->current_rsvp->setRsvp($new_option_id);
+      $this->current_rsvp->setRsvp($new_option_id, REGISTERED);
       // TODO: update registration
+    } elseif ($new_option->hasWaitlistAvailable()) {
+      $this->current_rsvp->setRsvp($new_option_id, WAITLISTED);
     } else {
       dsm('there is no room');
       // TODO: return error message

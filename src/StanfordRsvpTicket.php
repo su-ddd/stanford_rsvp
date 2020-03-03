@@ -51,7 +51,7 @@ class StanfordRsvpTicket {
     $database = \Drupal::database();
     $query = $database->select('stanford_rsvp_rsvps', 'srr');
     $query->condition('srr.tid', $this->id, '=');
-    $query->condition('srr.status', 1, '=');
+    $query->condition('srr.status', REGISTERED, '=');
     $num_rows = $query->countQuery()->execute()->fetchField();
     return $num_rows;
   }
@@ -60,7 +60,7 @@ class StanfordRsvpTicket {
     $database = \Drupal::database();
     $query = $database->select('stanford_rsvp_rsvps', 'srr');
     $query->condition('srr.tid', $this->id, '=');
-    $query->condition('srr.status', 2, '=');
+    $query->condition('srr.status', WAITLISTED, '=');
     $num_rows = $query->countQuery()->execute()->fetchField();
     return $num_rows;
   }

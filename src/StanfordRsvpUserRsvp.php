@@ -81,14 +81,16 @@ class StanfordRsvpUserRsvp {
     return $record;
   }
 
-  // update the RSVP 
-  public function setRsvp($ticket_id) {
+  // update the User's RSVP with a new ID as well as status
+ 
+  public function setRsvp($ticket_id, $status) {
     $database = \Drupal::database();
     $database->merge('stanford_rsvp_rsvps')
 	->key('uid', $this->user->id())
 	->key('nid', $this->event->id)
 	->fields([
 		'tid' => $ticket_id,
+		'status' => $status,
                 'created' => REQUEST_TIME,
 		])
 	->execute();

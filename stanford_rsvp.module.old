@@ -1,0 +1,796 @@
+<?php
+define("REGISTERED", 1);
+define("WAITLISTED", 2);
+define("CANCELLED", 3);
+
+/**
+ * Implementation of hook_block_info()
+ * This module creates one block to display RSVP options
+ */
+
+function stanford_rsvp_block_info() {
+
+	$blocks = array();
+
+  # Retrieve a list of active event / date combinations
+  $events = stanford_rsvp_event_date_ids();
+
+  foreach ($events as $event) {
+    $blocks['stanford_rsvp_' . $event->event_id . '_' . $event->date_id] = array(
+      'info'  => t('Stanford RSVP - ' . $event->event_name . ' - ' . $event->date_name),
+      'cache' => DRUPAL_NO_CACHE,
+      'status' => 1,
+      'region' => 'content',
+      'visibility' => BLOCK_VISIBILITY_LISTED,
+      'pages' => 'node/' . $event->event_id,
+      'weight' => 10,
+    );
+  }
+
+  return $blocks;
+}
+
+
+/**
+ * Implementation of hook_block_view().
+ * @param string $delta code to identify the block
+*/
+
+function stanford_rsvp_block_view($delta = '') {
+
+  // set up an empty array which will contain the block contents
+  $block = array();
+
+  if (preg_match('/stanford_rsvp_/', $delta)) {
+
+    $event_date_id = substr($delta, strlen('stanford_rsvp_'));
+    list($event_id, $date_id) = explode('_', $event_date_id);
+
+    $event = stanford_rsvp_event($event_id);
+    $date  = stanford_rsvp_date($date_id);
+   
+    if ($event->status) {
+      $block_content = '';
+
+      global $user;
+//     $block['subject'] = t('RSVP for ') . $date->name;
+      $start_date = date_create($date->start_date);
+      $end_date   = date_create($date->end_date);
+
+//      $block_content .= t('Event starts ') . date_format($start_date, 'M dS, Y g:i a') . "<br />";
+//      $block_content .= t('Event ends ') . date_format($end_date, 'M dS, Y g:i a');
+
+      // if the user is logged in, we check their registration status
+      if ($user->uid > 0) {
+        $rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+		if ($rsvp) {
+          if ($rsvp->status == REGISTERED) {
+    	    $block_content .= "<p>You are currently <strong>registered</strong> as: <br /> <strong>" . $rsvp->option_name . "</strong></p>";
+          } elseif ($rsvp->status == WAITLISTED) {
+    	    $block_content .= "<p>You are currently <strong>waitlisted</strong> as: <br /><strong>" . $rsvp->option_name . "</strong></p>";
+		  } else {
+    	    $block_content .= "<p>Your current selection is: <br /><strong>" . $rsvp->option_name . "</strong></p>";
+          } 
+        } else {
+        	$block_content .= "<p>You haven&rsquo;t RSVP&rsquo;ed yet.</p>";
+        }
+
+				$rsvp_form = drupal_get_form('stanford_rsvp_rsvp_form-' . $event_id . '-' . $date_id, array($event_id, $date_id));
+       	$block_content .= drupal_render($rsvp_form);
+      }
+      // if the user is anonymous, we'll ask them to log in before they can register.
+      else {
+		    $block_content .= '<p>' . t('Please log in to register.') . '</p>';
+        $block_content .= l(
+          'Log in',
+          variable_get('stanford_rsvp_login_url', 'user/login'),
+          array(
+            'attributes' => array('class' => array('btn success')),
+            'query'      => array(drupal_get_destination())
+          )
+        );
+      }
+      $block['content'] = $block_content;
+    }
+  }
+  return $block;
+}
+
+/**
+ * Find the user's current RSVP status
+ */
+
+function stanford_rsvp_user_rsvp($uid, $did) {
+  $rsvp = new stdClass();
+  $current_rsvp = db_query('SELECT oid, status FROM {stanford_rsvp_rsvps} WHERE uid = :uid and did = :did', array(':uid' => $uid, ':did' => $did))->fetchObject();
+
+  if ($current_rsvp) {
+    $option_name = db_query('SELECT fdftn.field_ticket_name_value from {field_data_field_tickets} as fdft join {field_data_field_ticket_name} as fdftn on (fdft.field_tickets_value = fdftn.entity_id) where fdft.field_tickets_value = :id', array(':id' => $current_rsvp->oid))->fetchField();
+    $rsvp->option_id   = $current_rsvp->oid;
+    $rsvp->option_name = $option_name;
+    $rsvp->status      = $current_rsvp->status;
+    return $rsvp;
+  } else {
+    return FALSE;
+  }
+}
+
+function stanford_rsvp_rsvps($oid, $status) {
+  $rsvps = db_query('SELECT r.uid, u.name, u.mail, r.created FROM {stanford_rsvp_rsvps} as r join {users} as u ON (u.uid = r.uid) WHERE r.oid = :oid and r.status = :status', array(':oid' => $oid, ':status' => $status))->fetchAll();
+  return $rsvps;
+}
+
+/**
+ * hook_forms
+ *
+ */
+function stanford_rsvp_forms($form_id, $args) {
+	$forms = array();
+        if (substr($form_id, 0, 23) == 'stanford_rsvp_rsvp_form') {
+		$forms[$form_id]['callback'] = 'stanford_rsvp_rsvp_form';
+	}
+	return $forms;
+}
+
+/**
+ * RSVP Form
+ */
+
+function stanford_rsvp_rsvp_form($form, $form_state, $args) {
+	$event_id = $args[0];
+	$date_id = $args[1];
+	global $user;
+
+  $rsvp_options = stanford_rsvp_get_options($date_id);
+  
+  $current_option = '';
+      
+  $current_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+  if ($current_rsvp) {
+    $current_option = $current_rsvp->option_id;
+  }
+
+  // check if the options have space available, and if not, note they are full
+  foreach ($rsvp_options as $option_id => $option_name) {
+    if ((!empty($current_option)) && ($option_id == $current_option)) {
+      continue;
+    }
+    if (!(stanford_rsvp_spaces_available($option_id, $date_id))) {
+      if (!(stanford_rsvp_waitlist_available($option_id, $date_id))) {
+        $rsvp_options[$option_id] = $option_name . ' - FULL';
+      } else {
+        $rsvp_options[$option_id] = $option_name . ' - WAITLIST';
+      }
+    }
+  }
+	
+  $form['rsvp_options_' . $date_id] = array(
+  	'#required' => true,
+    '#type' => 'select',
+    '#multiple' => false,
+    '#options' => $rsvp_options,
+    '#default_value' => $current_option,
+    '#empty_option' => ' Please select',
+  );
+  $form['event_id'] = array(
+    '#type' => 'hidden',
+    '#value' => $event_id,
+  );
+  $form['date_id'] = array(
+    '#type' => 'hidden',
+    '#value' => $date_id,
+  );
+  if (($current_option) && (count($rsvp_options) > 1)) {
+    $form['submit'] = array(
+      '#attributes' => array('class' => array('btn')),
+      '#type' => 'submit',
+      '#value' => t('Change RSVP')
+    );
+  } elseif (($current_option) && (count($rsvp_options) < 2)) {
+    # no submit button
+  } else {
+    $form['submit'] = array(
+      '#attributes' => array('class' => array('btn')),
+      '#type' => 'submit',
+      '#value' => t('RSVP')
+    );
+  }
+  if ($current_option)  {
+    if (stanford_rsvp_get_ticket_type($current_option) != 'cancel') {
+      $form['cancel'] = array(
+        '#attributes' => array('class' => array('btn', 'btn-danger')),
+        '#type' => 'submit',
+        '#value' => t('Cancel'),
+        '#submit' => array('stanford_rsvp_rsvp_form_cancel'),
+      );
+    }
+  }
+  return $form;
+}
+
+function stanford_rsvp_get_options($date_id) {
+  $rsvp_options = db_query("select fdft.field_tickets_value as id, fdftn.field_ticket_name_value as name from {field_data_field_tickets} as fdft join {field_data_field_ticket_name} as fdftn on fdft.field_tickets_value = fdftn.entity_id and fdft.bundle = 'date' and fdft.entity_id = :date_id order by fdft.delta ASC", array(':date_id' => $date_id))->fetchAllKeyed();
+  return $rsvp_options;
+}
+
+/*
+ * Are there spaces available for this date and ticket option?
+ * First check if there are space available for the event
+ *
+ */
+
+function stanford_rsvp_spaces_available($option_id, $date_id) {
+
+  if (!(stanford_rsvp_date_spaces_available($date_id))) {
+    return false;
+  }
+
+  // get the maximum number of rsvps
+  //  $max_rsvps = db_query('SELECT max_rsvps FROM {simple_rsvp_rt_options} WHERE id = :id and eid = :eid', array(':id' => $option_id, ':eid' => $event_id))->fetchField();
+  $max_rsvps = db_query('SELECT field_ticket_max_attendees_value from {field_data_field_ticket_max_attendees} where entity_id = :id', array(':id' => $option_id))->fetchField();
+
+  // if the value is null, there is no limit
+  if ($max_rsvps == null) {
+    return true;
+  }
+
+  // get the current number of rsvps
+  $current_rsvps = db_query('SELECT count(1) FROM {stanford_rsvp_rsvps} WHERE oid = :oid and status = 1', array(':oid' => $option_id))->fetchField();
+
+  if ($max_rsvps > $current_rsvps) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+function stanford_rsvp_waitlist_available($option_id, $date_id) {
+  $max_waitlist = db_query('SELECT field_ticket_max_waitlist_value from {field_data_field_ticket_max_waitlist} where entity_id = :id', array(':id' => $option_id))->fetchField();
+  if ($max_waitlist == null) {
+    return true;
+  }
+
+  $current_waitlist = db_query('SELECT count(1) FROM {stanford_rsvp_rsvps} WHERE oid = :oid and status = 2', array(':oid' => $option_id))->fetchField();
+
+  if ($max_waitlist > $current_waitlist) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+function stanford_rsvp_date_spaces_available($date_id) {
+  global $user;
+
+  $max_rsvps_per_date = db_query('select field_date_max_attendees_value from {field_data_field_date_max_attendees} where entity_id = :id', array(':id' => $date_id))->fetchField();
+
+  if (!$max_rsvps_per_date) {
+    $max_rsvps_per_date = 0;
+  }
+  // Get all options for this event
+  $rsvp_options = stanford_rsvp_get_options($date_id);
+
+  //db_query("SELECT id FROM {simple_rsvp_rt_options} where active = 1 and eid = :eid and cancel = 0 order by weight", array(':eid' => $event_id))->fetchAll();
+
+  $total_rsvps = 0;
+  
+  // count the total RSVPs for all options
+  foreach (array_keys($rsvp_options) as $option) {
+    if (stanford_rsvp_get_ticket_type($option) != 'cancel') {
+      $option_rsvps = db_query('SELECT count(1) FROM {stanford_rsvp_rsvps} WHERE oid = :oid', array(':oid' => $option))->fetchField();
+      $total_rsvps += $option_rsvps;
+    }
+  }
+
+  // Don't count the RSVP for this user, if they are registered
+  // That way, they can change from one RSVP to another
+  $rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+  if ($rsvp) {
+      $total_rsvps--;
+  }
+
+  if (($max_rsvps_per_date == 0) || ($max_rsvps_per_date > $total_rsvps)) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+function stanford_rsvp_rsvp_form_validate($form, &$form_state) {
+  $event_id  = $form_state['values']['event_id'];
+  $date_id  = $form_state['values']['date_id'];
+  $selected_option_id = $form_state['values']['rsvp_options_' . $date_id];
+
+  // check if there are any spaces available
+  if (!(stanford_rsvp_spaces_available($selected_option_id, $date_id)) && !(stanford_rsvp_waitlist_available($selected_option_id, $date_id))) {
+    // if not, before we mark this as an error
+    // let's see if the user is already RSVP'ed for this option
+    global $user;
+    $current_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+    if (!$current_rsvp || ($current_rsvp->option_id != $selected_option_id)) {
+      form_set_error('rsvp_options_' . $date_id, t('Please choose a valid option. This one is full.'));
+    }
+  }
+} 
+
+function stanford_rsvp_rsvp_form_submit($form, &$form_state) {
+  global $user;
+  $event_id = $form_state['values']['event_id'];
+  $date_id = $form_state['values']['date_id'];
+  $selected_option_id = $form_state['values']['rsvp_options_' . $date_id];
+
+  $current_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+  $spaces_available = stanford_rsvp_spaces_available($selected_option_id, $date_id);
+  $waitlist_available = stanford_rsvp_waitlist_available($selected_option_id, $date_id);
+
+  if ($current_rsvp && ($current_rsvp->option_id == $selected_option_id)) {
+    drupal_set_message('No change');
+  } else {
+    if (stanford_rsvp_get_ticket_type($selected_option_id) === 'cancel') {
+   	  stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 3);
+      if ($current_rsvp) {
+        $event    = stanford_rsvp_event($event_id);
+        $date     = stanford_rsvp_date($date_id);
+        stanford_rsvp_notify($user, $event, $date, '', 'cancellation');
+      }
+    } elseif ($spaces_available) {
+   	  stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 1);
+      $event    = stanford_rsvp_event($event_id);
+      $date     = stanford_rsvp_date($date_id);
+      $new_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+      stanford_rsvp_call_webhook($event, $date, $new_rsvp, $user);
+      stanford_rsvp_notify($user, $event, $date, $new_rsvp, 'registration');
+    } elseif ($waitlist_available) {
+      $event    = stanford_rsvp_event($event_id);
+      $date     = stanford_rsvp_date($date_id);
+      $new_rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+      stanford_rsvp_update_rsvp($user->uid, $form_state['values']['rsvp_options_' . $date_id], $form_state['values']['event_id'], $form_state['values']['date_id'], 2);
+      stanford_rsvp_notify($user, $event, $date, $new_rsvp, 'waitlist');
+ 	}
+  }
+}
+
+/*
+ *
+ * Submit Handler for the cancel button 
+ *
+ */
+
+function stanford_rsvp_rsvp_form_cancel($form, &$form_state) {
+  global $user;
+  $event_id = $form_state['values']['event_id'];
+  $date_id  = $form_state['values']['date_id'];
+  $event    = stanford_rsvp_event($event_id);
+  $date     = stanford_rsvp_date($date_id);
+  stanford_rsvp_cancel_rsvp($user->uid, $event_id, $date_id);
+  stanford_rsvp_notify($user, $event, $date, '', 'cancellation');
+}
+
+
+function stanford_rsvp_update_rsvp($uid, $rsvp_option, $event_id, $date_id, $status = REGISTERED) {
+  $user = user_load($uid);
+
+  // Log the registration
+//  watchdog('stanford_rsvp','Registered: %user', array('%user' => $user->name));
+  
+  // Create or update the user's status
+  db_merge('stanford_rsvp_rsvps')
+    ->key(array('uid' => $uid, 'eid' => $event_id, 'did' => $date_id))
+    ->fields(array(
+      'oid' => $rsvp_option,
+      'status' => $status,
+      'created' => REQUEST_TIME,
+    ))
+    ->execute();
+}
+
+// TODO: keep track of what we are cancelling and then look at the waitlist
+
+function stanford_rsvp_cancel_rsvp($uid, $event_id, $date_id) {
+  $user = user_load($uid);
+  $rsvp = stanford_rsvp_user_rsvp($user->uid, $date_id);
+
+  // Did we get an RSVP? If not, return an error.
+  if ($rsvp) {
+  	if ($rsvp->status == REGISTERED) {
+      // is there a person on the waitlist?
+      $first_person_on_waitlist_id = stanford_rsvp_waitlist_first_user($rsvp->option_id);
+  		// delete the rsvp
+      db_delete('stanford_rsvp_rsvps')->condition('uid', $uid)->condition('eid', $event_id)->condition('did', $date_id)->execute();
+
+      if ($first_person_on_waitlist_id) {
+        stanford_rsvp_update_rsvp($first_person_on_waitlist_id, $rsvp->option_id, $event_id, $date_id, REGISTERED);
+        $waitlisted_user = user_load($first_person_on_waitlist_id);
+        $event    = stanford_rsvp_event($event_id);
+        $date     = stanford_rsvp_date($date_id);
+        $new_rsvp = stanford_rsvp_user_rsvp($first_person_on_waitlist_id, $date_id);
+        stanford_rsvp_call_webhook($event, $date, $new_rsvp, $waitlisted_user);
+        stanford_rsvp_notify($waitlisted_user, $event, $date, $new_rsvp, 'registration_from_waitlist');
+      }
+
+   	 // trigger the waitlist for the date and option
+  	} elseif ($rsvp->status == WAITLISTED) {
+  		// delete the rsvp
+      db_delete('stanford_rsvp_rsvps')->condition('uid', $uid)->condition('eid', $event_id)->condition('did', $date_id)->execute();
+    }
+	} else {
+		drupal_set_message('Could not find an RSVP to cancel.', 'error');
+  }
+}
+
+/**
+ *  Find who's next on the waitlist
+ *  Note: there is a chance two people were waitlisted at the same time. In that case, the DB decides which to return
+ */
+
+function stanford_rsvp_waitlist_first_user($oid) {
+//  return db_query('SELECT uid FROM {stanford_rsvp_rsvps} WHERE status = :status and oid = :oid order by created limit 1', array(':status' => WAITLISTED, ':oid' => $oid))->fetchField();
+  return db_select('stanford_rsvp_rsvps','rsvp')
+	  ->fields('rsvp', array('uid'))
+ 	  ->condition('status', WAITLISTED, '=')
+ 	  ->condition('oid', $oid, '=')
+ 	  ->orderBy('created','ASC')
+    ->range(0,1)
+    ->execute()
+    ->fetchField();
+}
+
+/**
+ * Retrieve a list of all active event / date combinations
+ *
+ */
+
+function stanford_rsvp_event_date_ids() {
+  $events = db_query("select n.nid as event_id, n.title as event_name, fdfd.field_dates_value as date_id, fdfdn.field_date_name_value as date_name from field_data_field_dates as fdfd left join node as n on (n.nid = fdfd.entity_id) left join field_data_field_date_name as fdfdn on (fdfd.field_dates_value = fdfdn.entity_id) where n.status = 1 and n.type = 'event';")->fetchAll();
+  return $events;
+}
+
+/**
+ * Retrieve an event's information from the database
+ * Returns an object
+ */
+
+function stanford_rsvp_event($nid) {
+  $event = db_query('SELECT nid, uid, title as name, status FROM {node} as n WHERE n.nid = :nid and n.type = :type', array(':nid' => $nid, ':type' => 'event'))->fetchObject();
+  $author = user_load($event->uid);
+  $event->author = $author;
+  $event_dates = stanford_rsvp_event_dates($nid);
+  $event->dates = $event_dates;
+  $event->description = stanford_rsvp_event_get_description($nid);
+  $event->email = stanford_rsvp_event_get_email($nid);
+  $event->location = stanford_rsvp_event_get_location($nid);
+  $event->info_url = stanford_rsvp_event_get_info_url($nid);
+  $event->zoom = stanford_rsvp_event_get_zoom($nid);
+
+  return $event;
+}
+
+/**
+ * Retrieve an event's dates from the database database
+ * Returns an object
+ */
+
+function stanford_rsvp_event_dates($nid) {
+  $dates = db_query('select fdfd.field_dates_value as did from {field_data_field_dates} as fdfd where fdfd.entity_id = :nid', array(':nid' => $nid))->fetchAll();
+  foreach ($dates as $date) {
+    $date->name = stanford_rsvp_date_get_name($date->did);
+    $date->options = stanford_rsvp_date_get_options($date->did); 
+  }
+  return $dates;
+}
+
+/**
+ * Retrieve an event's email address
+ *
+ */
+
+function stanford_rsvp_event_get_description($eid) {
+  $description = db_query('SELECT body_value FROM {field_data_body} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  return $description;
+}
+
+/**
+ * Retrieve an event's email address
+ *
+ */
+
+function stanford_rsvp_event_get_email($eid) {
+  $email = db_query('SELECT field_event_email_value FROM {field_data_field_event_email} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  return $email;
+}
+
+/**
+ * Retrieve an event's location
+ *
+ */
+
+function stanford_rsvp_event_get_location($eid) {
+  $location = db_query('SELECT field_event_location_value FROM {field_data_field_event_location} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  return $location;
+}
+
+/**
+ * Retrieve an event's Zoom Info
+ *
+ */
+
+function stanford_rsvp_event_get_zoom($eid) {
+  $zoom = db_query('SELECT field_event_zoom_id_value FROM {field_data_field_event_zoom_id} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  return $zoom;
+}
+
+/**
+ * Retrieve an event's information URL
+ *
+ */
+
+function stanford_rsvp_event_get_info_url($eid) {
+  $info_url = db_query('SELECT field_event_info_url_value FROM {field_data_field_event_info_url} WHERE entity_id = :eid', array(':eid' => $eid))->fetchField();
+  return $info_url;
+}
+
+/**
+ * Retrieves a date
+ *
+ */
+
+function stanford_rsvp_date($did) {
+  $date = new stdClass();
+  $date->did = $did;
+  $date->name = stanford_rsvp_date_get_name($did);
+  $date->options = stanford_rsvp_date_get_options($date->did); 
+  list($date->start_date, $date->end_date) = stanford_rsvp_date_get_dates($date->did); 
+  $date->max_attendees = stanford_rsvp_date_get_max_attendees($date->did); 
+  return $date;
+}
+
+/**
+ * Retrieve a date's name
+ *
+ */
+
+function stanford_rsvp_date_get_name($did) {
+  $name = db_query('SELECT field_date_name_value FROM {field_data_field_date_name} WHERE entity_id = :did', array(':did' => $did))->fetchField();
+  return $name;
+}
+
+/**
+ * Retrieve a date's name
+ *
+ */
+
+function stanford_rsvp_date_get_max_attendees($did) {
+  $max_rsvps = db_query('select field_date_max_attendees_value from {field_data_field_date_max_attendees} where entity_id = :id', array(':id' => $did))->fetchField();
+  return $max_rsvps;
+}
+
+/**
+ * Retrieve a date's start and end dates
+ *
+ */
+
+function stanford_rsvp_date_get_dates($did) {
+  $result = db_query('SELECT field_event_date_value as start_date, field_event_date_value2 as end_date FROM {field_data_field_event_date} WHERE entity_id = :did', array(':did' => $did))->fetchAll();
+  return array($result[0]->start_date, $result[0]->end_date);
+}
+
+/**
+ * Retrieve the ticket options for a date
+ *
+ */
+
+function stanford_rsvp_date_get_options($did) {
+  $rsvp_options = db_query("select fdft.field_tickets_value as id, fdftn.field_ticket_name_value as name from {field_data_field_tickets} as fdft join {field_data_field_ticket_name} as fdftn on fdft.field_tickets_value = fdftn.entity_id and fdft.bundle = 'date' and fdft.entity_id = :date_id order by fdft.delta ASC", array(':date_id' => $did))->fetchAllKeyed();
+  return $rsvp_options;
+}
+
+function stanford_rsvp_get_ticket_type($oid) {
+  $type = db_query("select field_ticket_option_type_value from {field_data_field_ticket_option_type} where entity_id = :oid", array(':oid' => $oid))->fetchField();
+  if ($type) {
+    return $type;
+  } else {
+    return 'attend';
+  }
+}
+
+/**
+ * Call the Zapier webhook with the RSVP information
+ *
+ */
+
+function stanford_rsvp_call_webhook($event, $date, $rsvp, $user) {
+  $headers = array('Content-Type' => 'application/json');
+  $webhook = variable_get('stanford_rsvp_webhook');
+  $payload = [ 'email' => $user->mail, 'event_name' => $event->name, 'date_name' => $date->name, 'rsvp_name' => $rsvp->option_name, 'start_time' => $date->start_date, 'end_time' => $date->end_date, 'location' => $event->location, 'description' => $event->description, 'zoom' => $event->zoom, 'info_url' => $event->info_url, 'name' => $user->name ];
+  $json = json_encode($payload);
+  drupal_http_request($webhook, array('data' => $json, 'method' => 'POST', 'headers' => $headers));
+}
+
+/**
+ *  Send out an email to notify the user of a change in registration status
+ */
+
+function stanford_rsvp_notify($account, $event, $date, $rsvp, $key) {
+  $params['account'] = $account;
+  $params['event']   = $event;
+  $params['date']    = $date;
+  $params['rsvp']    = $rsvp;
+  $from_email = $event->author->mail;
+  if (!empty($event->email)) {
+    $from_email = $event->email;
+  } 
+  drupal_mail('stanford_rsvp', $key, $account->mail, user_preferred_language($account), $params, $from_email);
+}
+
+/**
+ *  Decide which email to send out and send it
+ */
+
+function stanford_rsvp_mail($key, &$message, $params) {
+  $language = $message['language'];
+  $variables = array('user' => $params['account'], 'event' => $params['event'], 'event-date' => $params['date'] );
+  $message['subject'] = _stanford_rsvp_mail_text($key . '_subject', $language, $variables);
+  $message['body'][]  = _stanford_rsvp_mail_text($key . '_body',    $language, $variables);
+
+  // Find out if the admin wants emails to bcc'ed to an email address 
+  $bcc_email = trim(variable_get('stanford_rsvp_bcc_email', 'marco.wise@stanford.edu'));
+  if (!empty($bcc_email)) {
+    $message['headers']['Bcc'] = $bcc_email;
+  }
+}
+
+function _stanford_rsvp_mail_text($key, $language = NULL, $variables = array(), $replace = TRUE) {
+  $langcode = isset($language) ? $language->language : NULL;
+
+  if ($admin_setting = variable_get('stanford_rsvp_email_' . $key, FALSE)) {
+    // An admin setting overrides the default string.
+    $text = $admin_setting;
+  }
+  else {
+    // No override, return default string.
+    switch($key) {
+      case 'waitlist_subject':
+        $text = t('Waitlist Receipt for @event-name', array('@event-name' => $variables['event']->name), array('langcode' => $langcode));
+        break;
+      case 'waitlist_body':
+        $text = t("Dear [user:name],\n\nYou have been waitlisted for @event-name.
+                   \nAs cancellations occur, those who are at the top of the waitlist will automatically be registered.
+                   \nIf that's you, you will receive an email to confirm your registration.
+                  ", array('@event-name' => $variables['event']->name), array('langcode' => $langcode));
+        break;
+      case 'cancellation_subject':
+        $text = t('Cancellation Receipt for @event-name', array('@event-name' => $variables['event']->name), array('langcode' => $langcode));
+        break;
+      case 'cancellation_body':
+        $text = t("Dear [user:name],
+                  \nAs requested, we've cancelled your registration. We are sorry we won't get to see you at the event.
+                  \nIf you received an invitation for the event, please decline the calendar invite as well.
+                  ", array(), array('langcode' => $langcode));
+        break;
+      case 'registration_subject':
+        $text = t("Registration Receipt for @event-name", array('@event-name' => $variables['event']->name), array('langcode' => $langcode));
+        break;
+      case 'registration_body':
+        $text = t("Dear [user:name],
+                  \nYou have been registered for @event-name.
+                  \nA calendar invite will follow shortly.
+                  \nIf for some reason you are unable to attend, we ask that you kindly cancel your registration so that waitlisted registrants can be accommodated. To cancel your registration, please go to the following link:
+                  \n@event-url
+                  ", array('@event-name' => $variables['event']->name, '@event-url' => $variables['event']->info_url, '@event-date-start-date' => $variables['event-date']->start_date), array('langcode' => $langcode));
+        break;
+      case 'registration_from_waitlist_subject':
+        $text = t("Registration Receipt for @event-name", array('@event-name' => $variables['event']->name), array('langcode' => $langcode));
+        break;
+      case 'registration_from_waitlist_body':
+        $text = t("Dear [user:name],
+                  \nCongratulations! A spot opened up and you have been registered for @event-name.
+                  \nA calendar invite will follow shortly.
+                  \nIf for some reason you are unable to attend, we would ask that you kindly cancel your registration so that waitlisted registrants can be accommodated. To cancel your registration, please go to the following link:
+                  \n@event-url
+                  ", array('@event-name' => $variables['event']->name, '@event-url' => $variables['event']->info_url), array('langcode' => $langcode));
+        break;
+      }
+  }
+
+  if ($replace) {
+    // We do not sanitize the token replacement, since the output of this
+    // replacement is intended for an e-mail message, not a web browser.
+    return token_replace($text, $variables, array('language' => $language, 'callback' => 'user_mail_tokens', 'sanitize' => FALSE, 'clear' => TRUE));
+  }
+
+  return $text;
+}
+
+/*
+function stanford_rsvp_token_info() {
+  $tokens = array(
+    'tokens' => array(
+      'event' => array(
+        'name' => array(
+          'name' => t('Event Name'),
+          'description' => t('The name of the event.'),
+        )
+      )
+    )
+  );
+  return $tokens;
+}
+*/
+
+
+/*
+ * 
+ *
+ */
+
+function stanford_rsvp_menu() {
+  $items = array();
+
+  $items['node/%node/attendees'] = array(
+    'title' => 'Attendees',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('stanford_rsvp_attendees_page', 1),
+    'access callback' => 'stanford_rsvp_attendees_page_access',
+    'access arguments' => array(1),
+    'file' => 'stanford_rsvp.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'theme callback' => 'variable_get',
+    'theme arguments' => array('admin_theme'),
+    'weight' => 3,
+  );
+
+  $items['rsvp_embed/%'] = array(
+    'title' => 'Embed Test',
+    'page callback' => 'stanford_rsvp_embed',
+    'page arguments' => array(1),
+    'access callback' => true,
+    'access arguments' => array(1),
+  );
+
+  return $items;
+}
+
+/*
+ * Attendee page - show only if:
+ *  - node is of type event
+ *  - viewer is not anonymous
+ *  - viewer has access (is author or on team) 
+ *
+ */
+
+function stanford_rsvp_attendees_page_access($node) {
+  global $user;
+
+  if (($node->type === 'event') &&
+      user_is_logged_in() &&
+      stanford_rsvp_user_can_administer($user, $node)) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+/* 
+ * Find out if user can administer an event
+ * For now, that's only if the user created the event
+ * TODO: see if they are in an admin workgroup
+ * TODO: see if the user has been added specifically to a list of admins
+ *
+ */
+
+function stanford_rsvp_user_can_administer($user, $node) {
+  $event_admin_role = user_role_load_by_name('Event Admin');
+  if (user_has_role($event_admin_role->rid, $user)) {
+    return true;
+  }
+  if ($user->uid === $node->uid) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+function stanford_rsvp_embed($date_id) {
+ $block = module_invoke('stanford_rsvp', 'block_view', 'stanford_rsvp_3_' . $date_id);
+ return render($block['content']);
+}
