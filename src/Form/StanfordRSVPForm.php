@@ -107,12 +107,15 @@ class StanfordRSVPForm extends FormBase
                 $form['actions']['submit']['#value'] = $this->t('Change RSVP');
             }
 
-            $form['actions']['cancel'] = array(
-                '#attributes' => array('class' => array('btn', 'btn-danger')),
-                '#type' => 'submit',
-                '#value' => t('Cancel'),
-                '#submit' => array('::cancel'),
-            );
+            if ($this->current_rsvp->ticket->ticket_type != 'cancel') {
+                $form['actions']['cancel'] = array(
+                    '#attributes' => array('class' => array('btn', 'btn-danger')),
+                    '#type' => 'submit',
+                    '#value' => t('Cancel'),
+                    '#submit' => array('::cancel'),
+                );
+            }
+
         } else {
             $form['actions']['submit'] = array(
                 '#attributes' => array('class' => array('btn')),
