@@ -16,7 +16,7 @@ class StanfordRsvpTicket {
   protected $node;
 
   public $id;
-  public $ticket_name;
+  public $name;
   public $max_attendees;
   public $total_attendees;
   public $max_waitlist;
@@ -32,14 +32,30 @@ class StanfordRsvpTicket {
    */
 
   public function __construct($ticket) {
-    $this->id = $ticket['uuid'];
-    $this->name      = $ticket['name'];
-    $this->max_attendees = $ticket['max_attendees'];
-    $this->total_attendees = $this->countTotalRegistrations();
-    $this->max_waitlist  = $ticket['max_waitlist'];
-    $this->total_waitlist = $this->countTotalWaitlisted();
-    $this->ticket_type   = $ticket['ticket_type'];
-    $this->ticket_found  = TRUE;
+      $this->id = $ticket['uuid'];
+      $this->name      = $ticket['name'];
+
+      $this->ticket_type   = $ticket['ticket_type'];
+
+      // Cancellation tickets have no limit, even if an admin entered one by mistake
+
+      if ($this->ticket_type == 'cancel') {
+          $this->max_attendees = '';
+      } else {
+          $this->max_attendees = $ticket['max_attendees'];
+      }
+
+      $this->total_attendees = $this->countTotalRegistrations();
+
+      if ($this->ticket_type == 'cancel') {
+          $this->max_waitlist = '';
+      } else {
+          $this->max_waitlist  = $ticket['max_waitlist'];
+      }
+
+      $this->total_waitlist = $this->countTotalWaitlisted();
+
+      $this->ticket_found  = TRUE;
   }
 
   // how many people are registered for this option?
@@ -105,7 +121,7 @@ class StanfordRsvpTicket {
     // if we've found a position, fill in the details 
     if ($key !== FALSE) {
       $current_ticket_type = $ticket_types[$key];
-      $this->ticket_name = $current_ticket_type['name'];
+      $this->name = $current_ticket_type['name'];
       $this->max_attendees = $current_ticket_type['max_attendees'];
       $this->max_waitlist = $current_ticket_type['max_waitlist'];
       $this->ticket_type = $current_ticket_type['ticket_type'];

@@ -155,9 +155,11 @@ class StanfordRSVPForm extends FormBase {
     // if the option chosen is a cancel option
     if ($new_option->ticket_type == 'cancel') {
       dsm('you have chosen a cancel option');
+      $this->current_rsvp->setRsvp($new_option_id, CANCELLED);
       // if the user had something selected before
       // send a notification that they cancelled
       // cancel registration
+        return;
     }
 
     dsm($new_option->countTotalRegistrations());
