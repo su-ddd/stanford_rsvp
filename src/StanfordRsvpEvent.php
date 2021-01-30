@@ -65,7 +65,7 @@ class StanfordRsvpEvent
     public function countAttendees() {
         $total_attendees = 0;
         foreach ($this->tickets as $ticket) {
-            if ($ticket->type != 'cancel') {
+            if ($ticket->ticket_type != 'cancel') {
                 $total_attendees = $total_attendees + $ticket->total_attendees;
             }
         }

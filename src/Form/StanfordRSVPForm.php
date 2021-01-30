@@ -151,12 +151,12 @@ class StanfordRSVPForm extends FormBase
             return;
         }
 
-        $old_option_id = $this->current_rsvp->ticket->id;
-
-        // if the chosen option is the same as the current one, do nothing
-        if ($new_option_id == $old_option_id) {
-            drupal_set_message(t('The option selected is the same as the current one. No change.'));
-            return;
+        if (isset($this->current_rsvp->ticket->id)) {
+            // if the chosen option is the same as the current one, do nothing
+            if ($new_option_id == $this->current_rsvp->ticket->id) {
+                drupal_set_message(t('The option selected is the same as the current one. No change.'));
+                return;
+            }
         }
 
         // load the ticket option
