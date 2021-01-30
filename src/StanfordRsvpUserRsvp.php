@@ -26,48 +26,35 @@ class StanfordRsvpUserRsvp {
 
   public $ticket;
 
-  public $type; // registration or waitlist?
- 
-  protected $ticket_found = FALSE;
+  protected $rsvp_found = FALSE;
 
-  /**
-   * Constructs a new StanfordRsvp.
-   *
-   * @param \Drupal\Core\Entity\Node $node
-   *   The node on which this is built.
-   *
-   * @param Drupal\Core\Session\AccountProxy
-   *   The Drupal user.
-   */
+  public $status; // registered or waitlisted?
+
+    /**
+     * Constructs a new StanfordRsvp.
+     *
+     * @param \Drupal\stanford_rsvp\StanfordRsvpEvent $event
+     * @param \Drupal\Core\Session\AccountProxy $user
+     */
   public function __construct(\Drupal\stanford_rsvp\StanfordRsvpEvent $event, \Drupal\Core\Session\AccountProxy $user) {
     $this->event = $event;
     $this->user = $user;
 
     // is there an existing Rsvp?
     $current_rsvp = $this->getRsvp();
+
     if ($current_rsvp) {
       $this->ticket = $this->event->getTicket($current_rsvp->tid);
-      $this->status    = $current_rsvp->status;
-      $this->ticket_found = TRUE;
+      $this->status = $current_rsvp->status;
+      $this->rsvp_found = TRUE;
     }
   }
 
-  /**
-   * Determines if the event still has spaces available
-   *
-   * @return bool
-   *   TRUE if there are still spaces available, FALSE otherwise.
-   */
   public function hasRsvp() {
-    // look inside the stanford_rsvp_rsvps for an entry with this user and event
-    if ($this->ticket_found) { 
-      return TRUE;
-    } else {
-      return FALSE;
-    }
+    return $this->rsvp_found;
   }
 
-  // look inside the stanford_rsvp_rsvps for an entry with this user and event
+  // load the RSVP from the stanford_rsvp_rsvps table
 
   public function getRsvp() {
     $database = \Drupal::database();
@@ -77,8 +64,7 @@ class StanfordRsvpUserRsvp {
     $query->condition('srr.uid', $this->user->id(), '=');
     $query->condition('srr.nid', $this->event->id, '=');
     $result = $query->execute();
-    $record = $result->fetch();
-    return $record;
+    return $result->fetch();
   }
 
   // update the User's RSVP with a new ID as well as status
@@ -95,4 +81,15 @@ class StanfordRsvpUserRsvp {
 		])
 	->execute();
   }
+
+  // Delete a user's RSVP
+    public function deleteRSVP() {
+        $database = \Drupal::database();
+        $query = $database->delete('stanford_rsvp_rsvps')
+            ->condition('uid', $this->user->id(), '=')
+            ->condition('nid', $this->event->id, '=');
+        $result = $query->execute();
+        dsm($result);
+        return $result;
+    }
 }

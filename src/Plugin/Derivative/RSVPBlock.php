@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\stanford_rsvp\Plugin\Derivatie\RSVPBlock.
+ * Contains \Drupal\stanford_rsvp\Plugin\Derivative\RSVPBlock.
  */
 
 namespace Drupal\stanford_rsvp\Plugin\Derivative;

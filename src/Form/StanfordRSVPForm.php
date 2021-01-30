@@ -34,8 +34,6 @@ class StanfordRSVPForm extends FormBase {
     $this->node  = $node;
     $this->event = new StanfordRsvpEvent($node);
 
-    dsm($this->event->debug());
-
     $user     = \Drupal::currentUser();
     $this->current_rsvp = new StanfordRsvpUserRsvp($this->event, $user);
 
@@ -185,5 +183,6 @@ class StanfordRSVPForm extends FormBase {
 
   public function cancel() {
     dsm('you clicked cancel');
+    $this->current_rsvp->deleteRsvp();
   }
 }
