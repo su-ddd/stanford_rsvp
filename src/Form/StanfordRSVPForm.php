@@ -93,6 +93,7 @@ class StanfordRSVPForm extends FormBase
         $rsvp_options = array();
 
         foreach ($ticket_types as $ticket_type) {
+            dump($ticket_type->countTotalRegistered());
             if ($ticket_type->hasSpaceAvailable() ||
                 ($ticket_type->getTicketType() == TicketType::TYPE_CANCELLATION) ||
                 ($ticket_type->getId() == $current_option)) {

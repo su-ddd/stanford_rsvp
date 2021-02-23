@@ -136,23 +136,56 @@ class TicketType
         $this->ticket_type = $ticket_type;
     }
 
-    public function hasSpaceAvailable()
+    /**
+     * @return bool
+     */
+    public function hasSpaceAvailable(): bool
     {
-        // TODO: implement hasSpaceAvailable()
-        return true;
+        if (is_null($this->getMaxAttendees())) {
+            return true;
+        }
+
+        if ($this->countTotalRegistered() < $this->getMaxAttendees()) {
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 
-    public function hasWaitlistAvailable()
+    /**
+     * @return bool
+     */
+    public function hasWaitlistAvailable(): bool
     {
-        // TODO: implement hasWaitlistAvailable()
-        return true;
+        if (is_null($this->getMaxWaitlist())) {
+            return true;
+        }
+
+        if ($this->countTotalWaitlisted() < $this->getMaxWaitlist()) {
+            return true;
+        }
+        else {
+            return false;
+        }
     }
 
-    public function countTotalRegistrations()
+    /**
+     * @return int
+     */
+    public function countTotalRegistered(): int
     {
         $ticket_loader = new TicketLoader();
-        $tickets = $ticket_loader->loadTicketsByTicketType($this);
-        return count($tickets);
+        return $ticket_loader->countTicketsByTicketTypeAndStatus($this, Ticket::STATUS_REGISTERED);
+    }
+
+    /**
+     * @return int
+     */
+    public function countTotalWaitlisted(): int
+    {
+        $ticket_loader = new TicketLoader();
+        return $ticket_loader->countTicketsByTicketTypeAndStatus($this, Ticket::STATUS_WAITLISTED);
     }
 /*
     public function countTotalWaitlisted()
