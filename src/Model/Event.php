@@ -109,19 +109,40 @@ class Event
     }
 
     /**
-     * An event has spaces available if at least one option has spaces availabled
+     * An event has spaces available if at least one option has spaces available
      * and the total number of registered people is below the maximum for the
      * event itself.
      *
      * @return bool
      */
-    public function hasSpacesAvailable() {
-        // TODO: implement hasSpacesAvailable
-        return true;
+    public function hasSpaceAvailable(): bool
+    {
+        $total_attendees = $this->countAttendees();
+        if ($total_attendees >= $this->getMaxAttendees()) {
+            return false;
+        }
+
+        foreach ($this->getTicketTypes() as $ticketType) {
+            if ($ticketType->hasSpaceAvailable()) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    public function countAttendees() {
-        //TODO: Count registered attendees for each ticket type and return the total
+    /**
+     * @return int
+     */
+    public function countAttendees(): int
+    {
+        $total_attendees = 0;
+
+        foreach ($this->getTicketTypes() as $ticketType) {
+            if ($ticketType->getTicketType() != TicketType::TYPE_CANCELLATION) {
+                $total_attendees = $total_attendees + $ticketType->countTotalRegistered();
+            }
+        }
+        return $total_attendees;
     }
 
     /**

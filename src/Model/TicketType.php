@@ -49,11 +49,22 @@ class TicketType
 
     public function __construct(string $id, string $name, ?int $max_attendees, ?int $max_waitlist, string $ticket_type)
     {
-        $this->id = $id;
-        $this->name = $name;
-        $this->max_attendees = $max_attendees;
-        $this->max_waitlist = $max_waitlist;
-        $this->ticket_type = $ticket_type;
+        $this->setId($id);
+        $this->setName($name);
+
+        // override any limits on attendees and waitlist if this is a ticket
+        // of type cancellation
+
+        if ($ticket_type == TicketType::TYPE_CANCELLATION) {
+            $this->setMaxAttendees(null);
+            $this->setMaxWaitlist(null);
+        }
+        else {
+            $this->setMaxAttendees($max_attendees);
+            $this->setMaxWaitlist($max_waitlist);
+        }
+
+        $this->setTicketType($ticket_type);
     }
 
     /**
@@ -187,16 +198,5 @@ class TicketType
         $ticket_loader = new TicketLoader();
         return $ticket_loader->countTicketsByTicketTypeAndStatus($this, Ticket::STATUS_WAITLISTED);
     }
-/*
-    public function countTotalWaitlisted()
-    {
-        $database = \Drupal::database();
-        $query = $database->select('stanford_rsvp_rsvps', 'srr');
-        $query->condition('srr.tid', $this->id, '=');
-        $query->condition('srr.status', WAITLISTED, '=');
-        $num_rows = $query->countQuery()->execute()->fetchField();
-        return $num_rows;
-    }
-*/
 
 }
