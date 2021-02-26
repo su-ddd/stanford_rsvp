@@ -1,0 +1,18 @@
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_stanford_rsvp_from_email
+    - node.type.stanford_rsvp
+id: node.stanford_rsvp.field_stanford_rsvp_from_email
+field_name: field_stanford_rsvp_from_email
+entity_type: node
+bundle: stanford_rsvp
+label: 'From: Email'
+description: 'Email address to use to send confirmation emails.'
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings: {  }
+field_type: email

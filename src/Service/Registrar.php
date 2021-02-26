@@ -55,6 +55,22 @@ class Registrar
     /**
      * @param AccountProxyInterface $user
      * @param Event $event
+     */
+    public function delete(AccountProxyInterface $user, Event $event) {
+        $database = Drupal::database();
+
+        $database->delete('stanford_rsvp_rsvps')
+            ->condition('uid', $user->id())
+            ->condition('nid', $event->getId())
+            ->execute();
+
+        //TODO: find a better sentence
+        Drupal::messenger()->addStatus(t('Ticket Cancelled'));
+    }
+
+    /**
+     * @param AccountProxyInterface $user
+     * @param Event $event
      * @param TicketType $ticket_type
      * @param int $status
      * @return Ticket

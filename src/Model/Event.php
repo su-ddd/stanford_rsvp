@@ -43,6 +43,12 @@ class Event
     private $invitationText;
 
     /**
+     * Email to use to send invitation text
+     * @var string
+     */
+    private $invitationFromEmail;
+
+    /**
      * The day and time the event starts
      * @var DrupalDateTime
      */
@@ -79,7 +85,7 @@ class Event
      * @param int $maxAttendees
      * @param TicketType[] $ticketTypes
      */
-    public function __construct(int $id, string $name, string $location, string $remoteLocation, string $infoUrl, string $invitationText, DrupalDateTime $startDate, DrupalDateTime $endDate, int $maxAttendees, array $ticketTypes)
+    public function __construct(int $id, string $name, string $location, string $remoteLocation, string $infoUrl, string $invitationText, string $invitationFromEmail, DrupalDateTime $startDate, DrupalDateTime $endDate, int $maxAttendees, array $ticketTypes)
     {
         $this->setId($id);
         $this->setName($name);
@@ -87,6 +93,7 @@ class Event
         $this->setRemoteLocation($remoteLocation);
         $this->setInfoUrl($infoUrl);
         $this->setInvitationText($invitationText);
+        $this->setInvitationFromEmail($invitationFromEmail);
         $this->setStartDate($startDate);
         $this->setEndDate($endDate);
         $this->setMaxAttendees($maxAttendees);
@@ -310,6 +317,22 @@ class Event
     public function setTicketTypes($ticketTypes): void
     {
         $this->ticketTypes = $ticketTypes;
+    }
+
+    /**
+     * @return string
+     */
+    public function getInvitationFromEmail(): string
+    {
+        return $this->invitationFromEmail;
+    }
+
+    /**
+     * @param string $invitationFromEmail
+     */
+    public function setInvitationFromEmail(string $invitationFromEmail): void
+    {
+        $this->invitationFromEmail = $invitationFromEmail;
     }
 
     public function __toString()

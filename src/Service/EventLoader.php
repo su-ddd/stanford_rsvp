@@ -27,6 +27,7 @@ class EventLoader
             $node->get('field_stanford_rsvp_zoom_id')->getString(),
             $node->get('field_stanford_rsvp_info_url')->getString(),
             $node->get('field_stanford_rsvp_text')->get(0)->value,
+            $node->get('field_stanford_rsvp_from_email')->get(0)->value,
             $node->get('field_stanford_rsvp_date')->get(0)->start_date,
             $node->get('field_stanford_rsvp_date')->get(0)->end_date,
             $node->get('field_stanford_rsvp_max')->getString(),

@@ -93,7 +93,6 @@ class StanfordRSVPForm extends FormBase
         $rsvp_options = array();
 
         foreach ($ticket_types as $ticket_type) {
-            dump($ticket_type->countTotalRegistered());
             if ($ticket_type->hasSpaceAvailable() ||
                 ($ticket_type->getTicketType() == TicketType::TYPE_CANCELLATION) ||
                 ($ticket_type->getId() == $current_option)) {
@@ -151,7 +150,7 @@ class StanfordRSVPForm extends FormBase
                     '#attributes' => array('class' => array('btn', 'btn-danger')),
                     '#type' => 'submit',
                     '#value' => t('Cancel'),
-                    '#submit' => array('::cancel'),
+                    '#submit' => array([$this, 'cancel']),
                 );
             }
 
@@ -225,8 +224,6 @@ class StanfordRSVPForm extends FormBase
             return;
         }
 
-        dump($ticket_loader->countTicketsByTicketTypeAndStatus($new_option, Ticket::STATUS_REGISTERED));
-
         // Check to see if there are any spaces available for the option chosen.
 
         if ($new_option->hasSpaceAvailable()) {
@@ -246,9 +243,14 @@ class StanfordRSVPForm extends FormBase
         // notify the user that they are on the waitlist
     }
 
-    public function cancel()
+    public function cancel(array &$form, FormStateInterface &$form_state)
     {
-        dsm('you clicked cancel');
-        $this->current_rsvp->deleteRsvp();
+        $user = Drupal::currentUser();
+
+        $event_loader = new EventLoader();
+        $event = $event_loader->getEventById($form_state->getValue('event_id'));
+
+        $registrar = new Drupal\stanford_rsvp\Service\Registrar();
+        $registrar->delete($user, $event);
     }
 }
