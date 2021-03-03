@@ -1,1 +1,24 @@
 <?php
+/**
+ * Implements hook_theme()
+ *
+ * @param $existing
+ * @param $type
+ * @param $theme
+ * @param $path
+ * @return string[][]
+ */
+function stanford_rsvp_theme($existing, $type, $theme, $path): array
+{
+    return [
+        'stanford_rsvp_attendees' => [
+            'render element' => 'children',
+            'template' => 'stanford_rsvp-attendees',
+            'path', $path . '/templates',
+            'variables' => [
+                'event' => [],
+                'ticket_types' => [],
+            ],
+        ]
+    ];
+}

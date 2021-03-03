@@ -16,6 +16,7 @@ use Drupal\stanford_rsvp\Model\Ticket;
 use Drupal\stanford_rsvp\Model\TicketType;
 use Drupal\stanford_rsvp\Service\TicketLoader;
 use Drupal\stanford_rsvp\Service\EventLoader;
+use Drupal\user\Entity\User;
 
 class StanfordRSVPForm extends FormBase
 {
@@ -60,7 +61,7 @@ class StanfordRSVPForm extends FormBase
             '#type' => 'hidden',
             '#default_value' => $this->event->getId());
 
-        $user = Drupal::currentUser();
+        $user = User::load(\Drupal::currentUser()->id());
 
         $ticket_loader = new TicketLoader();
         $this->current_rsvp = $ticket_loader->loadTicket($this->event, $user);
@@ -185,7 +186,7 @@ class StanfordRSVPForm extends FormBase
     public function submitForm(array &$form, FormStateInterface $form_state)
     {
         $registrar = new Drupal\stanford_rsvp\Service\Registrar();
-        $user = Drupal::currentUser();
+        $user = User::load(\Drupal::currentUser()->id());
 
         $ticket_loader = new TicketLoader();
         $this->current_rsvp = $ticket_loader->loadTicket($this->event, $user);
@@ -245,7 +246,7 @@ class StanfordRSVPForm extends FormBase
 
     public function cancel(array &$form, FormStateInterface &$form_state)
     {
-        $user = Drupal::currentUser();
+        $user = User::load(\Drupal::currentUser()->id());
 
         $event_loader = new EventLoader();
         $event = $event_loader->getEventById($form_state->getValue('event_id'));

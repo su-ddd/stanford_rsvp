@@ -5,58 +5,58 @@ namespace Drupal\stanford_rsvp\Service;
 
 
 use Drupal;
-use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\stanford_rsvp\Model\Event;
 use Drupal\stanford_rsvp\Model\Ticket;
 use Drupal\stanford_rsvp\Model\TicketType;
+use Drupal\user\Entity\User;
 use Exception;
 
 class Registrar
 {
     /**
-     * @param AccountProxyInterface $user
+     * @param User $user
      * @param Event $event
      * @param TicketType $ticket_type
      * @return Ticket
      * @throws Exception
      */
-    public function register(AccountProxyInterface $user, Event $event, TicketType $ticket_type): Ticket
+    public function register(User $user, Event $event, TicketType $ticket_type): Ticket
     {
         // TODO: send notification
         return $this->save($user, $event, $ticket_type, Ticket::STATUS_REGISTERED);
     }
 
     /**
-     * @param AccountProxyInterface $user
+     * @param User $user
      * @param Event $event
      * @param TicketType $ticket_type
      * @return Ticket
      * @throws Exception
      */
-    public function waitlist(AccountProxyInterface $user, Event $event, TicketType $ticket_type): Ticket
+    public function waitlist(User $user, Event $event, TicketType $ticket_type): Ticket
     {
         // TODO: send notification
         return $this->save($user, $event, $ticket_type, Ticket::STATUS_WAITLISTED);
     }
 
     /**
-     * @param AccountProxyInterface $user
+     * @param User $user
      * @param Event $event
      * @param TicketType $ticket_type
      * @return Ticket
      * @throws Exception
      */
-    public function cancel(AccountProxyInterface $user, Event $event, TicketType $ticket_type): Ticket
+    public function cancel(User $user, Event $event, TicketType $ticket_type): Ticket
     {
         // TODO: send notification
         return $this->save($user, $event, $ticket_type, Ticket::STATUS_CANCELLED);
     }
 
     /**
-     * @param AccountProxyInterface $user
+     * @param User $user
      * @param Event $event
      */
-    public function delete(AccountProxyInterface $user, Event $event) {
+    public function delete(User $user, Event $event) {
         $database = Drupal::database();
 
         $database->delete('stanford_rsvp_rsvps')
@@ -69,16 +69,17 @@ class Registrar
     }
 
     /**
-     * @param AccountProxyInterface $user
+     * @param User $user
      * @param Event $event
      * @param TicketType $ticket_type
      * @param int $status
      * @return Ticket
      * @throws Exception
      */
-    private function save(AccountProxyInterface $user, Event $event, TicketType $ticket_type, int $status): Ticket
+    private function save(User $user, Event $event, TicketType $ticket_type, int $status): Ticket
     {
-        $ticket = new Ticket($user, $status, $event, $ticket_type);
+        $now = time();
+        $ticket = new Ticket($user, $status, $event, $ticket_type, $now);
 
         $database = Drupal::database();
 

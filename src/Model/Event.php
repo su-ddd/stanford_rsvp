@@ -63,7 +63,7 @@ class Event
     /**
      * The total number of attendees for the entire event
      * Note: individual ticket types might have their own maximum number of attendees
-     * @var int
+     * @var mixed
      */
     private $maxAttendees;
 
@@ -80,12 +80,13 @@ class Event
      * @param string $remoteLocation
      * @param string $infoUrl
      * @param string $invitationText
-     * @param $startDate
-     * @param $endDate
-     * @param int $maxAttendees
+     * @param string $invitationFromEmail
+     * @param DrupalDateTime $startDate
+     * @param DrupalDateTime $endDate
+     * @param string $maxAttendees
      * @param TicketType[] $ticketTypes
      */
-    public function __construct(int $id, string $name, string $location, string $remoteLocation, string $infoUrl, string $invitationText, string $invitationFromEmail, DrupalDateTime $startDate, DrupalDateTime $endDate, int $maxAttendees, array $ticketTypes)
+    public function __construct(int $id, string $name, string $location, string $remoteLocation, string $infoUrl, string $invitationText, string $invitationFromEmail, DrupalDateTime $startDate, DrupalDateTime $endDate, string $maxAttendees, array $ticketTypes)
     {
         $this->setId($id);
         $this->setName($name);

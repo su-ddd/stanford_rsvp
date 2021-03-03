@@ -11,7 +11,8 @@ class TicketTypeLoader
      * @param $node
      * @return TicketType[]
      */
-    public function getTicketTypesByNode($node) {
+    public function getTicketTypesByNode($node): array
+    {
         $tickets = array();
 
         foreach ($node->get('field_stanford_rsvp_ticket_types')->getValue() as $ticket) {

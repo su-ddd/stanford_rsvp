@@ -1,0 +1,10 @@
+stanford_rsvp.attendees:
+  path: '/node/{node}/attendees'
+  defaults:
+    _controller: '\Drupal\stanford_rsvp\Controller\AttendeesController::content'
+    _title_callback: '\Drupal\stanford_rsvp\Controller\AttendeesController::getTitle'
+  requirements:
+    _permission: 'stanford rsvp attendees viewer'
+    _custom_access: '\Drupal\stanford_rsvp\Controller\AttendeesController::access'
+    node: \d+
+

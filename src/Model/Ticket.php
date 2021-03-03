@@ -3,7 +3,9 @@
 
 namespace Drupal\stanford_rsvp\Model;
 
-use Drupal\Core\Session\AccountProxyInterface;
+use DateTime;
+use Drupal\Core\Datetime\DrupalDateTime;
+use Drupal\user\Entity\User;
 
 class Ticket
 {
@@ -12,7 +14,7 @@ class Ticket
     const STATUS_CANCELLED  = 3;
 
     /**
-     * @var AccountProxyInterface;
+     * @var User;
      */
     private $user;
 
@@ -32,32 +34,40 @@ class Ticket
     private $ticket_type;
 
     /**
+     * @var int
+     */
+
+    private $timestamp;
+
+    /**
      * Ticket constructor.
-     * @param AccountProxyInterface $user
+     * @param User $user
      * @param int $status
      * @param Event $event
      * @param TicketType $ticket_type
+     * @param int $timestamp
      */
-    public function __construct(AccountProxyInterface $user, int $status, Event $event, TicketType $ticket_type)
+    public function __construct(User $user, int $status, Event $event, TicketType $ticket_type, int $timestamp)
     {
         $this->setUser($user);
         $this->setStatus($status);
         $this->setEvent($event);
         $this->setTicketType($ticket_type);
+        $this->setTimestamp($timestamp);
     }
 
     /**
-     * @return AccountProxyInterface
+     * @return User
      */
-    public function getUser(): AccountProxyInterface
+    public function getUser(): User
     {
         return $this->user;
     }
 
     /**
-     * @param AccountProxyInterface $user
+     * @param User $user
      */
-    public function setUser(AccountProxyInterface $user): void
+    public function setUser(User $user): void
     {
         $this->user = $user;
     }
@@ -110,4 +120,24 @@ class Ticket
         $this->ticket_type = $ticket_type;
     }
 
+    /**
+     * @return int
+     */
+    public function getTimestamp(): int
+    {
+        return $this->timestamp;
+    }
+
+    /**
+     * @param int $timestamp
+     */
+    public function setTimestamp(int $timestamp): void
+    {
+        $this->timestamp = $timestamp;
+    }
+
+    public function getFormattedCreatedDate()
+    {
+        return date('M dS, Y g:i a', $this->getTimestamp());
+    }
 }

@@ -1,0 +1,5 @@
+stanford_rsvp.attendees:
+  route_name: stanford_rsvp.attendees
+  title: 'Attendees'
+  base_route: entity.node.canonical
+  weight: 100
