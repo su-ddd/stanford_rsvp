@@ -9,6 +9,7 @@ use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\node\Entity\Node;
 use Drupal\stanford_rsvp\Model\Ticket;
+use Drupal\stanford_rsvp\Model\TicketType;
 use Drupal\stanford_rsvp\Service\EventLoader;
 use Drupal\stanford_rsvp\Service\TicketLoader;
 
@@ -37,20 +38,17 @@ class AttendeesController extends ControllerBase
 
         foreach ($event->getTicketTypes() as $ticketType) {
             $name = $ticketType->getName();
-            $attendees = array();
 
-            $ticketLoader = new TicketLoader();
-            $tickets = $ticketLoader->loadTicketsByTicketTypeAndStatus($ticketType, Ticket::STATUS_REGISTERED);
-
-            foreach ($tickets as $ticket) {
-                $attendees[] = array(
-                    'name' => $ticket->getUser()->getDisplayName(),
-                    'email' => $ticket->getUser()->getEmail(),
-                    'date' => $ticket->getFormattedCreatedDate(),
-                );
+            $registered_attendees = $this->listAttendeesByTicketTypeAndStatus($ticketType, Ticket::STATUS_REGISTERED);
+            if ($registered_attendees) {
+                $ticket_types[] = array('name' => $name, 'status' => 'Registered', 'total' => count($registered_attendees), 'attendees' => $registered_attendees);
             }
 
-            $ticket_types[] = array('name' => $name, 'attendees' => $attendees);
+            $waitlisted_attendees = $this->listAttendeesByTicketTypeAndStatus($ticketType, Ticket::STATUS_WAITLISTED);
+            if ($waitlisted_attendees) {
+                $ticket_types[] = array('name' => $name, 'status' => 'Waitlisted', 'total' => count($waitlisted_attendees), 'attendees' => $waitlisted_attendees);
+            }
+
         }
 
         return [
@@ -87,5 +85,36 @@ class AttendeesController extends ControllerBase
 
         return $result;
     }
+
+    /**
+     * @param TicketType $ticketType
+     * @param int $status
+     * @return array
+     * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
+     * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
+     * @throws \Drupal\Core\TypedData\Exception\MissingDataException
+     */
+
+    private function listAttendeesByTicketTypeAndStatus(TicketType $ticketType, int $status): array
+    {
+
+        $ticketLoader = new TicketLoader();
+
+        $attendees = array();
+
+        $tickets = $ticketLoader->loadTicketsByTicketTypeAndStatus($ticketType, $status);
+
+        foreach ($tickets as $ticket) {
+            $attendees[] = array(
+                'name' => $ticket->getUser()->getDisplayName(),
+                'email' => $ticket->getUser()->getEmail(),
+                'date' => $ticket->getFormattedCreatedDate(),
+            );
+        }
+
+        return $attendees;
+    }
+
+
 
 }

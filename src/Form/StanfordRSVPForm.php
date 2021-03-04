@@ -175,6 +175,9 @@ class StanfordRSVPForm extends FormBase
      */
     public function validateForm(array &$form, FormStateInterface $form_state)
     {
+        // TODO: validation
+        // E.g. not a valid option, full option
+
         //   if (strlen($form_state->getValue('phone_number')) < 3) {
         //     $form_state->setErrorByName('phone_number', $this->t('The phone number is too short. Please enter a full phone number.'));
         //   }
@@ -251,7 +254,10 @@ class StanfordRSVPForm extends FormBase
         $event_loader = new EventLoader();
         $event = $event_loader->getEventById($form_state->getValue('event_id'));
 
+        $ticket_loader = new TicketLoader();
+        $current_rsvp = $ticket_loader->loadTicket($this->event, $user);
+
         $registrar = new Drupal\stanford_rsvp\Service\Registrar();
-        $registrar->delete($user, $event);
+        $registrar->delete($user, $event, $current_rsvp->getTicketType());
     }
 }

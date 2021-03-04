@@ -19,3 +19,13 @@ See the LICENSE file.
 ## Known Issues
 
 ## Troubleshooting
+
+## TODO
+
+* Login link should work even if SimpleSaml is not installed
+* Notify users by email
+* Call webhook
+* Handle waitlist
+* Delete registrations when event is deleted
+* Log registrations
+

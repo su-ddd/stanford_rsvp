@@ -1,7 +1,7 @@
 {{ event.getName }}
 
 {% for ticket_type in ticket_types %}
-        <h2>{{ ticket_type.name }}</h2>
+        <h2>{{ ticket_type.name }} - {{ ticket_type.status }} - Total: {{ ticket_type.total }}</h2>
         <table>
                 <tr><th>Name</th><th>Email</th><th>Date</th></tr>
         {%  for ticket in ticket_type.attendees %}

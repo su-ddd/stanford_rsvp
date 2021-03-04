@@ -48,15 +48,25 @@ class Registrar
      */
     public function cancel(User $user, Event $event, TicketType $ticket_type): Ticket
     {
+
+        // TODO: waitlist
+        // If there is a waitlist, delete the user, then register the first person on the waitlist
+        // If there is no waitlist, delete the user
+
         // TODO: send notification
         return $this->save($user, $event, $ticket_type, Ticket::STATUS_CANCELLED);
+
+        // TODO: waitlist
+        // Get the first person on the waitlist, if any
+
     }
 
     /**
      * @param User $user
      * @param Event $event
+     * @param TicketType $ticket_type
      */
-    public function delete(User $user, Event $event) {
+    public function delete(User $user, Event $event, TicketType $ticket_type) {
         $database = Drupal::database();
 
         $database->delete('stanford_rsvp_rsvps')
@@ -66,6 +76,11 @@ class Registrar
 
         //TODO: find a better sentence
         Drupal::messenger()->addStatus(t('Ticket Cancelled'));
+
+        $ticketLoader = new TicketLoader();
+        $waitlist = $ticketLoader->getWaitlistForTicketType($ticket_type);
+
+        Drupal::messenger()->addStatus("Waitlist Size: " . count($waitlist));
     }
 
     /**

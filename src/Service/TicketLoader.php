@@ -50,11 +50,13 @@ class TicketLoader
      */
     public function loadTicketsByTicketTypeAndStatus(TicketType $ticketType, int $status): array
     {
+
         $database = Drupal::database();
         $query = $database->select('stanford_rsvp_rsvps', 'srr');
         $query->fields('srr');
         $query->condition('srr.tid', $ticketType->getId());
         $query->condition('srr.status', $status);
+        $query->orderBy('created', 'ASC');
         $result = $query->execute()->fetchAll();
 
         $tickets = array();
@@ -84,5 +86,9 @@ class TicketLoader
         $query->condition('srr.tid', $ticketType->getId());
         $query->condition('srr.status', $status);
         return $query->countQuery()->execute()->fetchField();
+    }
+
+    public function getWaitlistForTicketType(TicketType $ticketType) {
+        return $this->loadTicketsByTicketTypeAndStatus($ticketType, Ticket::STATUS_WAITLISTED);
     }
 }
