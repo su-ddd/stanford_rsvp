@@ -26,12 +26,12 @@ class TicketType
     /**
      * @var int|null
      */
-    private $max_attendees;
+    private $maxAttendees;
 
     /**
      * @var int|null
      */
-    private $max_waitlist;
+    private $maxWaitlist;
 
     /**
      * @var string
@@ -39,15 +39,37 @@ class TicketType
     private $ticket_type;
 
     /**
+     * @var Ticket[]
+     */
+    private $tickets_registered;
+
+    /**
+     * @var Ticket[]
+     */
+    private $tickets_waitlisted;
+
+    /**
+     * @var Ticket[]
+     */
+    private $tickets;
+
+    /**
+     * @var int
+     */
+    private $eventId;
+
+    /**
      * TicketType constructor.
      * @param string $id
      * @param string $name
-     * @param int|null $max_attendees
-     * @param int|null $max_waitlist
+     * @param int|null $maxAttendees
+     * @param int|null $maxWaitlist
      * @param string $ticket_type
+     * @param int $eventId
+     * @param Ticket[] $tickets
      */
 
-    public function __construct(string $id, string $name, ?int $max_attendees, ?int $max_waitlist, string $ticket_type)
+    public function __construct(string $id, string $name, ?int $maxAttendees, ?int $maxWaitlist, string $ticket_type, int $eventId, array $tickets)
     {
         $this->setId($id);
         $this->setName($name);
@@ -60,11 +82,15 @@ class TicketType
             $this->setMaxWaitlist(null);
         }
         else {
-            $this->setMaxAttendees($max_attendees);
-            $this->setMaxWaitlist($max_waitlist);
+            $this->setMaxAttendees($maxAttendees);
+            $this->setMaxWaitlist($maxWaitlist);
         }
 
         $this->setTicketType($ticket_type);
+
+        $this->setEventId($eventId);
+
+        $this->setTickets($tickets);
     }
 
     /**
@@ -104,15 +130,15 @@ class TicketType
      */
     public function getMaxAttendees(): ?int
     {
-        return $this->max_attendees;
+        return $this->maxAttendees;
     }
 
     /**
-     * @param int|null $max_attendees
+     * @param int|null $maxAttendees
      */
-    public function setMaxAttendees(?int $max_attendees): void
+    public function setMaxAttendees(?int $maxAttendees): void
     {
-        $this->max_attendees = $max_attendees;
+        $this->maxAttendees = $maxAttendees;
     }
 
     /**
@@ -120,15 +146,15 @@ class TicketType
      */
     public function getMaxWaitlist(): ?int
     {
-        return $this->max_waitlist;
+        return $this->maxWaitlist;
     }
 
     /**
-     * @param int|null $max_waitlist
+     * @param int|null $maxWaitlist
      */
-    public function setMaxWaitlist(?int $max_waitlist): void
+    public function setMaxWaitlist(?int $maxWaitlist): void
     {
-        $this->max_waitlist = $max_waitlist;
+        $this->maxWaitlist = $maxWaitlist;
     }
 
     /**
@@ -145,6 +171,38 @@ class TicketType
     public function setTicketType(string $ticket_type): void
     {
         $this->ticket_type = $ticket_type;
+    }
+
+    /**
+     * @return int
+     */
+    public function getEventId(): int
+    {
+        return $this->eventId;
+    }
+
+    /**
+     * @param int $eventId
+     */
+    public function setEventId(int $eventId): void
+    {
+        $this->eventId = $eventId;
+    }
+
+    /**
+     * @return Ticket[]
+     */
+    public function getTickets(): array
+    {
+        return $this->tickets;
+    }
+
+    /**
+     * @param Ticket[] $tickets
+     */
+    public function setTickets(array $tickets): void
+    {
+        $this->tickets = $tickets;
     }
 
     /**
@@ -186,8 +244,13 @@ class TicketType
      */
     public function countTotalRegistered(): int
     {
-        $ticket_loader = new TicketLoader();
-        return $ticket_loader->countTicketsByTicketTypeAndStatus($this, Ticket::STATUS_REGISTERED);
+        $total = 0;
+        foreach ($this->getTickets() as $ticket) {
+            if ($ticket->getStatus() == Ticket::STATUS_REGISTERED) {
+                $total = $total + 1;
+            }
+        }
+        return $total;
     }
 
     /**
@@ -195,8 +258,61 @@ class TicketType
      */
     public function countTotalWaitlisted(): int
     {
-        $ticket_loader = new TicketLoader();
-        return $ticket_loader->countTicketsByTicketTypeAndStatus($this, Ticket::STATUS_WAITLISTED);
+        $total = 0;
+        foreach ($this->getTickets() as $ticket) {
+            if ($ticket->getStatus() == Ticket::STATUS_WAITLISTED) {
+                $total = $total + 1;
+            }
+        }
+        return $total;
     }
 
+    /**
+     * @return array
+     */
+    public function getRegisteredAttendees(): array
+    {
+        return $this->getAttendeesByStatus(TICKET::STATUS_REGISTERED);
+    }
+
+    /**
+     * @return array
+     */
+    public function getWaitlistedAttendees(): array
+    {
+        return $this->getAttendeesByStatus(TICKET::STATUS_WAITLISTED);
+    }
+
+    /**
+     * @param int $status
+     * @return array
+     */
+    public function getAttendeesByStatus($status): array
+    {
+        $attendees = array();
+        foreach($this->getTickets() as $ticket) {
+            if ($ticket->getStatus() == $status) {
+                $attendees[] = array(
+                    'name' => $ticket->getUser()->getDisplayName(),
+                    'email' => $ticket->getUser()->getEmail(),
+                    'date' => $ticket->getFormattedCreatedDate(),
+                );
+            }
+        }
+        return $attendees;
+    }
+
+    /**
+     * @return Ticket[]
+     */
+    public function getWaitList(): array
+    {
+        $waitlist = array();
+        foreach ($this->getTickets() as $ticket) {
+            if ($ticket->getStatus() == Ticket::STATUS_WAITLISTED) {
+                $waitlist[] = $ticket;
+            }
+        }
+        return $waitlist;
+    }
 }

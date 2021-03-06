@@ -2,15 +2,39 @@
 
 namespace Drupal\stanford_rsvp\Service;
 
-use Drupal;
-use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
-use Drupal\Component\Plugin\Exception\PluginNotFoundException;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\TypedData\Exception\MissingDataException;
 use Drupal\node\Entity\Node;
+use Drupal\node\NodeStorageInterface;
 use Drupal\stanford_rsvp\Model\Event as Event;
 
 class EventLoader
 {
+    /**
+     * @var EntityTypeManagerInterface
+     */
+    protected $entityTypeManager;
+
+    /**
+     * @var NodeStorageInterface
+     */
+    protected $nodeStorage;
+
+    /**
+     * @var TicketTypeLoader
+     */
+    private $ticketTypeLoader;
+
+    /**
+     * @param EntityTypeManagerInterface $entity_type_manager
+     * @param TicketTypeLoader $ticketTypeLoader
+     */
+    public function __construct(EntityTypeManagerInterface $entity_type_manager, TicketTypeLoader $ticketTypeLoader) {
+        $this->entityTypeManager = $entity_type_manager;
+        $this->nodeStorage =  $this->entityTypeManager->getStorage('node');
+        $this->ticketTypeLoader = $ticketTypeLoader;
+    }
+
     /**
      * @param Node $node
      * @return Event
@@ -18,8 +42,7 @@ class EventLoader
      */
     public function getEventByNode(Node $node): Event
     {
-        $ticketTypeLoader = new TicketTypeLoader();
-        $ticketTypes = $ticketTypeLoader->getTicketTypesByNode($node);
+        $ticketTypes = $this->ticketTypeLoader->getTicketTypesByNode($node);
 
         return new Event($node->id(),
             $node->getTitle(),
@@ -36,15 +59,13 @@ class EventLoader
     }
 
     /**
-     * @param $nid
+     * @param int $nid
      * @return Event
-     * @throws InvalidPluginDefinitionException
-     * @throws PluginNotFoundException
      * @throws MissingDataException
      */
-    public function getEventById($nid): Event
+    public function getEventById(int $nid): Event
     {
-        $node = Drupal::entityTypeManager()->getStorage('node')->load($nid);
+        $node = $this->nodeStorage->load($nid);
         return $this->getEventByNode($node);
     }
 

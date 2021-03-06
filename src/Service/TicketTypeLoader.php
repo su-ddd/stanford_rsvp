@@ -3,27 +3,49 @@
 
 namespace Drupal\stanford_rsvp\Service;
 
+use Drupal\node\Entity\Node;
 use Drupal\stanford_rsvp\Model\TicketType;
 
 class TicketTypeLoader
 {
     /**
-     * @param $node
+     * @var TicketLoader
+     */
+    private $ticketLoader;
+
+    /**
+     * TicketTypeLoader constructor.
+     * @param TicketLoader $ticketLoader
+     */
+    public function __construct(TicketLoader $ticketLoader)
+    {
+        $this->ticketLoader = $ticketLoader;
+    }
+
+    /**
+     * @param Node $node
      * @return TicketType[]
      */
-    public function getTicketTypesByNode($node): array
+    public function getTicketTypesByNode(Node $node): array
     {
-        $tickets = array();
+        $ticketTypes = array();
+        $event_id = $node->id();
 
-        foreach ($node->get('field_stanford_rsvp_ticket_types')->getValue() as $ticket) {
-            $tickets[] = new TicketType($ticket['uuid'],
-                $ticket['name'],
-                (int) $ticket['max_attendees'],
-                (int) $ticket['max_waitlist'],
-                $ticket['ticket_type']);
+        foreach ($node->get('field_stanford_rsvp_ticket_types')->getValue() as $ticketType) {
+
+            $tickets = $this->ticketLoader->loadTicketsByTicketTypeId($ticketType['uuid']);
+
+            $ticketTypes[] = new TicketType($ticketType['uuid'],
+                $ticketType['name'],
+                (int)$ticketType['max_attendees'],
+                (int)$ticketType['max_waitlist'],
+                $ticketType['ticket_type'],
+                $event_id,
+                $tickets
+            );
         }
 
-        return $tickets;
+        return $ticketTypes;
     }
 
 }

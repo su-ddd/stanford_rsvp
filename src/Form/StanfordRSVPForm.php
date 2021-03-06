@@ -14,25 +14,26 @@ use Drupal\node\Entity\Node;
 use Drupal\stanford_rsvp\Model\Event;
 use Drupal\stanford_rsvp\Model\Ticket;
 use Drupal\stanford_rsvp\Model\TicketType;
+use Drupal\stanford_rsvp\Service\Notifier;
 use Drupal\stanford_rsvp\Service\TicketLoader;
 use Drupal\stanford_rsvp\Service\EventLoader;
+use Drupal\stanford_rsvp\Service\Registrar;
+
 use Drupal\user\Entity\User;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+
 
 class StanfordRSVPForm extends FormBase
 {
     /**
-     * {@inheritdoc}
-     */
-
-    public function getFormId(): string
-    {
-        return 'stanford_rsvp_form';
-    }
-
-    /**
      * @var Ticket
      */
     private $current_rsvp;
+
+    /**
+     * @var TicketType
+     */
+    private $currentTicketType;
 
     /**
      * @var Event
@@ -44,30 +45,77 @@ class StanfordRSVPForm extends FormBase
      */
     private $node;
 
+    /**
+     * @var EventLoader
+     */
+    private $eventLoader;
+
+    /**
+     * @var TicketLoader
+     */
+    private $ticketLoader;
+
+    /**
+     * @var Registrar
+     */
+    private $registrar;
+
+    /**
+     * @var Notifier
+     */
+    private $notifier;
+
+
+    public function __construct (EventLoader $event_loader, TicketLoader $ticket_loader, Registrar $registrar, Notifier $notifier) {
+        $this->eventLoader = $event_loader;
+        $this->ticketLoader = $ticket_loader;
+        $this->registrar = $registrar;
+        $this->notifier = $notifier;
+    }
+
+
+    /**
+     * {@inheritdoc}
+     */
+    public static function create(ContainerInterface $container): StanfordRSVPForm
+    {
+        // Instantiates this form class.
+        return new static(
+        // Load the service required to construct this class.
+            $container->get('stanford_rsvp.event_loader'),
+            $container->get('stanford_rsvp.ticket_loader'),
+            $container->get('stanford_rsvp.registrar'),
+            $container->get('stanford_rsvp.notifier')
+        );
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+
+    public function getFormId(): string
+    {
+        return 'stanford_rsvp_form';
+    }
 
     /**
      * {@inheritdoc}
      */
     public function buildForm(array $form, FormStateInterface $form_state, Node $node = NULL): array
     {
-
-
         $this->node = $node;
+        $this->event = $this->eventLoader->getEventByNode($node);
+        $user = User::load(Drupal::currentUser()->id());
 
-        $event_loader = new EventLoader();
-        $this->event = $event_loader->getEventByNode($node);
+        $this->current_rsvp = $this->ticketLoader->loadTicket($this->event, $user);
 
         $form['event_id'] = array(
             '#type' => 'hidden',
             '#default_value' => $this->event->getId());
 
-        $user = User::load(\Drupal::currentUser()->id());
-
-        $ticket_loader = new TicketLoader();
-        $this->current_rsvp = $ticket_loader->loadTicket($this->event, $user);
-
         // Print out the logged-in user's current status (registered, waitlisted or none)
         if ($this->current_rsvp) {
+            $this->currentTicketType = $this->event->getTicketTypeById($this->current_rsvp->getTicketTypeId());
 
             $status_text = t('Your current selection is:');
 
@@ -79,14 +127,14 @@ class StanfordRSVPForm extends FormBase
                 $status_text = t('You are currently <strong>waitlisted</strong> for:');
             }
 
-            $form['status']['#markup'] = '<p>' . $status_text . '<br /><em>' . $this->current_rsvp->getTicketType()->getName() . '</em></p>';
+            $form['status']['#markup'] = '<p>' . $status_text . '<br /><em>' . $this->currentTicketType->getName() . '</em></p>';
         } else {
             $form['status']['#markup'] = '<p>' . t('You haven&rsquo;t RSVP&rsquo;ed yet.') . '</p>';
         }
 
         $current_option = '';
         if ($this->current_rsvp) {
-            $current_option = $this->current_rsvp->getTicketType()->getId();
+            $current_option = $this->current_rsvp->getTicketTypeId();
         }
 
         $ticket_types = $this->event->getTicketTypes();
@@ -146,7 +194,7 @@ class StanfordRSVPForm extends FormBase
             // Only show a "Cancel" button if this isn't already a cancellation
             // type of ticket type (e.g. I won't be able to attend)
 
-            if ($this->current_rsvp->getTicketType()->getTicketType() != TicketType::TYPE_CANCELLATION) {
+            if (isset($this->currentTicketType) && ($this->currentTicketType->getTicketType() != TicketType::TYPE_CANCELLATION)) {
                 $form['actions']['cancel'] = array(
                     '#attributes' => array('class' => array('btn', 'btn-danger')),
                     '#type' => 'submit',
@@ -181,6 +229,14 @@ class StanfordRSVPForm extends FormBase
         //   if (strlen($form_state->getValue('phone_number')) < 3) {
         //     $form_state->setErrorByName('phone_number', $this->t('The phone number is too short. Please enter a full phone number.'));
         //   }
+/*
+        $new_option_id = $form_state->getValue('rsvp_options');
+
+        // If nothing was selected, do nothing.
+        if (empty($new_option_id)) {
+            $form_state->setErrorByName('rsvp_options', $this->t('No option selected. No change.'));
+        }
+*/
     }
 
     /**
@@ -188,26 +244,15 @@ class StanfordRSVPForm extends FormBase
      */
     public function submitForm(array &$form, FormStateInterface $form_state)
     {
-        $registrar = new Drupal\stanford_rsvp\Service\Registrar();
-        $user = User::load(\Drupal::currentUser()->id());
+        $user = User::load(Drupal::currentUser()->id());
 
-        $ticket_loader = new TicketLoader();
-        $this->current_rsvp = $ticket_loader->loadTicket($this->event, $user);
-
-        $event_loader = new EventLoader();
-        $event = $event_loader->getEventById($form_state->getValue('event_id'));
+        $this->current_rsvp = $this->ticketLoader->loadTicket($this->event, $user);
 
         $new_option_id = $form_state->getValue('rsvp_options');
 
-        // If nothing was selected, do nothing.
-        if (empty($new_option_id)) {
-            Drupal::messenger()->addStatus(t('No option selected. No change.'));
-            return;
-        }
-
         // If the option selected is the same as the current RSVP, do nothing.
         if (isset($this->current_rsvp)) {
-            if ($new_option_id == $this->current_rsvp->getTicketType()->getId()) {
+            if ($new_option_id == $this->current_rsvp->getTicketTypeId()) {
                 Drupal::messenger()->addStatus(t('The option selected is the same as the current one. No change.'));
                 return;
             }
@@ -224,17 +269,19 @@ class StanfordRSVPForm extends FormBase
 
         // if the option chosen is a cancel option
         if ($new_option->getTicketType() == TicketType::TYPE_CANCELLATION) {
-            $registrar->cancel($user, $event, $new_option);
+            $this->registrar->cancel($user, $new_option);
             return;
         }
 
         // Check to see if there are any spaces available for the option chosen.
 
         if ($new_option->hasSpaceAvailable()) {
-            $ticket = $registrar->register($user, $event, $new_option);
+            $ticket = $this->registrar->register($user, $new_option);
+            $this->notifier->notify($user, $this->event, $ticket);
+
             // TODO: update registration
         } elseif ($new_option->hasWaitlistAvailable()) {
-            $ticket = $registrar->waitlist($user, $event, $new_option);
+            $ticket = $this->registrar->waitlist($user, $new_option);
         } else {
             dsm('there is no room');
             // TODO: return error message
@@ -249,15 +296,7 @@ class StanfordRSVPForm extends FormBase
 
     public function cancel(array &$form, FormStateInterface &$form_state)
     {
-        $user = User::load(\Drupal::currentUser()->id());
-
-        $event_loader = new EventLoader();
-        $event = $event_loader->getEventById($form_state->getValue('event_id'));
-
-        $ticket_loader = new TicketLoader();
-        $current_rsvp = $ticket_loader->loadTicket($this->event, $user);
-
-        $registrar = new Drupal\stanford_rsvp\Service\Registrar();
-        $registrar->delete($user, $event, $current_rsvp->getTicketType());
+        $user = User::load(Drupal::currentUser()->id());
+        $this->registrar->delete($user, $this->currentTicketType);
     }
 }

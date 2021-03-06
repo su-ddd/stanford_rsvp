@@ -7,11 +7,12 @@ use Drupal\Core\Access\AccessResultAllowed;
 use Drupal\Core\Access\AccessResultForbidden;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\TypedData\Exception\MissingDataException;
 use Drupal\node\Entity\Node;
-use Drupal\stanford_rsvp\Model\Ticket;
-use Drupal\stanford_rsvp\Model\TicketType;
 use Drupal\stanford_rsvp\Service\EventLoader;
 use Drupal\stanford_rsvp\Service\TicketLoader;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+
 
 
 /**
@@ -19,32 +20,51 @@ use Drupal\stanford_rsvp\Service\TicketLoader;
  */
 class AttendeesController extends ControllerBase
 {
+    /**
+     * @var EventLoader
+     */
+    private $eventLoader;
+
+    /**
+     * @var ticketLoader
+     */
+    private $ticketLoader;
+
+
+    public function __construct(EventLoader $eventLoader, TicketLoader $ticketLoader) {
+        $this->eventLoader = $eventLoader;
+        $this->ticketLoader = $ticketLoader;
+    }
+
+    public static function create(ContainerInterface $container): AttendeesController
+    {
+        return new static(
+            $container->get('stanford_rsvp.event_loader'),
+            $container->get('stanford_rsvp.ticket_loader')
+        );
+    }
 
     /**
      * Returns a render-able array for a test page.
      * @param $node
      * @return array
-     * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-     * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
-     * @throws \Drupal\Core\TypedData\Exception\MissingDataException
+     * @throws MissingDataException
      */
-    public function content($node)
+    public function content($node): array
     {
-        $eventLoader = new EventLoader;
-
-        $event = $eventLoader->getEventById($node);
+        $event = $this->eventLoader->getEventById($node);
 
         $ticket_types = array();
 
         foreach ($event->getTicketTypes() as $ticketType) {
             $name = $ticketType->getName();
 
-            $registered_attendees = $this->listAttendeesByTicketTypeAndStatus($ticketType, Ticket::STATUS_REGISTERED);
+            $registered_attendees = $ticketType->getRegisteredAttendees();
             if ($registered_attendees) {
                 $ticket_types[] = array('name' => $name, 'status' => 'Registered', 'total' => count($registered_attendees), 'attendees' => $registered_attendees);
             }
 
-            $waitlisted_attendees = $this->listAttendeesByTicketTypeAndStatus($ticketType, Ticket::STATUS_WAITLISTED);
+            $waitlisted_attendees = $ticketType->getWaitlistedAttendees();
             if ($waitlisted_attendees) {
                 $ticket_types[] = array('name' => $name, 'status' => 'Waitlisted', 'total' => count($waitlisted_attendees), 'attendees' => $waitlisted_attendees);
             }
@@ -85,36 +105,5 @@ class AttendeesController extends ControllerBase
 
         return $result;
     }
-
-    /**
-     * @param TicketType $ticketType
-     * @param int $status
-     * @return array
-     * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
-     * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
-     * @throws \Drupal\Core\TypedData\Exception\MissingDataException
-     */
-
-    private function listAttendeesByTicketTypeAndStatus(TicketType $ticketType, int $status): array
-    {
-
-        $ticketLoader = new TicketLoader();
-
-        $attendees = array();
-
-        $tickets = $ticketLoader->loadTicketsByTicketTypeAndStatus($ticketType, $status);
-
-        foreach ($tickets as $ticket) {
-            $attendees[] = array(
-                'name' => $ticket->getUser()->getDisplayName(),
-                'email' => $ticket->getUser()->getEmail(),
-                'date' => $ticket->getFormattedCreatedDate(),
-            );
-        }
-
-        return $attendees;
-    }
-
-
 
 }

@@ -3,8 +3,6 @@
 
 namespace Drupal\stanford_rsvp\Model;
 
-use DateTime;
-use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\user\Entity\User;
 
 class Ticket
@@ -24,14 +22,14 @@ class Ticket
     private $status;
 
     /**
-     * @var Event;
+     * @var int;
      */
-    private $event;
+    private $eventId;
 
     /**
-     * @var TicketType;
+     * @var string;
      */
-    private $ticket_type;
+    private $ticketTypeId;
 
     /**
      * @var int
@@ -43,16 +41,16 @@ class Ticket
      * Ticket constructor.
      * @param User $user
      * @param int $status
-     * @param Event $event
-     * @param TicketType $ticket_type
+     * @param int $eventId
+     * @param string $ticketTypeId
      * @param int $timestamp
      */
-    public function __construct(User $user, int $status, Event $event, TicketType $ticket_type, int $timestamp)
+    public function __construct(User $user, int $status, int $eventId, string $ticketTypeId, int $timestamp)
     {
         $this->setUser($user);
         $this->setStatus($status);
-        $this->setEvent($event);
-        $this->setTicketType($ticket_type);
+        $this->setEventId($eventId);
+        $this->setTicketTypeId($ticketTypeId);
         $this->setTimestamp($timestamp);
     }
 
@@ -89,35 +87,35 @@ class Ticket
     }
 
     /**
-     * @return Event
+     * @return int
      */
-    public function getEvent(): Event
+    public function getEventId(): int
     {
-        return $this->event;
+        return $this->eventId;
     }
 
     /**
-     * @param Event $event
+     * @param int $eventId
      */
-    public function setEvent(Event $event): void
+    public function setEventId(int $eventId): void
     {
-        $this->event = $event;
+        $this->eventId = $eventId;
     }
 
     /**
-     * @return TicketType
+     * @return string
      */
-    public function getTicketType(): TicketType
+    public function getTicketTypeId(): string
     {
-        return $this->ticket_type;
+        return $this->ticketTypeId;
     }
 
     /**
-     * @param TicketType $ticket_type
+     * @param string $ticketTypeId
      */
-    public function setTicketType(TicketType $ticket_type): void
+    public function setTicketTypeId(string $ticketTypeId): void
     {
-        $this->ticket_type = $ticket_type;
+        $this->ticketTypeId = $ticketTypeId;
     }
 
     /**

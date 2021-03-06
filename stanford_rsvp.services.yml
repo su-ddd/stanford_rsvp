@@ -3,5 +3,24 @@ services:
     class: Drupal\stanford_rsvp\StanfordRSVPUninstallValidator
     tags:
       - { name: module_install.uninstall_validator }
-    arguments: ['@entity.query']
+    arguments:
+      - '@entity.query'
     lazy: true
+  stanford_rsvp.event_loader:
+    class: Drupal\stanford_rsvp\Service\EventLoader
+    arguments:
+      - '@entity_type.manager'
+      - '@stanford_rsvp.ticket_type_loader'
+  stanford_rsvp.ticket_type_loader:
+    class: Drupal\stanford_rsvp\Service\TicketTypeLoader
+    arguments:
+      - '@stanford_rsvp.ticket_loader'
+  stanford_rsvp.ticket_loader:
+    class: Drupal\stanford_rsvp\Service\TicketLoader
+  stanford_rsvp.registrar:
+    class: Drupal\stanford_rsvp\Service\Registrar
+    arguments:
+      - '@stanford_rsvp.event_loader'
+      - '@stanford_rsvp.ticket_loader'
+  stanford_rsvp.notifier:
+    class: Drupal\stanford_rsvp\Service\Notifier
