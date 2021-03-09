@@ -22,5 +22,6 @@ services:
     arguments:
       - '@stanford_rsvp.event_loader'
       - '@stanford_rsvp.ticket_loader'
+      - '@stanford_rsvp.notifier'
   stanford_rsvp.notifier:
     class: Drupal\stanford_rsvp\Service\Notifier

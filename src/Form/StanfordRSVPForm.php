@@ -26,9 +26,9 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 class StanfordRSVPForm extends FormBase
 {
     /**
-     * @var Ticket
+     * @var Ticket|null
      */
-    private $current_rsvp;
+    private $currentTicket;
 
     /**
      * @var TicketType
@@ -44,6 +44,11 @@ class StanfordRSVPForm extends FormBase
      * @var Node
      */
     private $node;
+
+    /**
+     * @var User
+     */
+    private $currentUser;
 
     /**
      * @var EventLoader
@@ -103,38 +108,36 @@ class StanfordRSVPForm extends FormBase
      */
     public function buildForm(array $form, FormStateInterface $form_state, Node $node = NULL): array
     {
+        // TODO: return if there is no node, or if the node is not an event.
         $this->node = $node;
         $this->event = $this->eventLoader->getEventByNode($node);
-        $user = User::load(Drupal::currentUser()->id());
-
-        $this->current_rsvp = $this->ticketLoader->loadTicket($this->event, $user);
 
         $form['event_id'] = array(
             '#type' => 'hidden',
-            '#default_value' => $this->event->getId());
+            '#default_value' => $this->getEvent()->getId());
 
         // Print out the logged-in user's current status (registered, waitlisted or none)
-        if ($this->current_rsvp) {
-            $this->currentTicketType = $this->event->getTicketTypeById($this->current_rsvp->getTicketTypeId());
+        if ($this->getCurrentTicket()) {
+            $this->setCurrentTicketType($this->event->getTicketTypeById($this->getCurrentTicket()->getTicketTypeId()));
 
             $status_text = t('Your current selection is:');
 
-            if ($this->current_rsvp->getStatus() == Ticket::STATUS_REGISTERED) {
+            if ($this->getCurrentTicket()->getStatus() == Ticket::STATUS_REGISTERED) {
                 $status_text = t('You are currently <strong>registered</strong> for:');
             }
 
-            if ($this->current_rsvp->getStatus() == Ticket::STATUS_WAITLISTED) {
+            if ($this->getCurrentTicket()->getStatus() == Ticket::STATUS_WAITLISTED) {
                 $status_text = t('You are currently <strong>waitlisted</strong> for:');
             }
 
-            $form['status']['#markup'] = '<p>' . $status_text . '<br /><em>' . $this->currentTicketType->getName() . '</em></p>';
+            $form['status']['#markup'] = '<p>' . $status_text . '<br /><em>' . $this->getCurrentTicketType()->getName() . '</em></p>';
         } else {
             $form['status']['#markup'] = '<p>' . t('You haven&rsquo;t RSVP&rsquo;ed yet.') . '</p>';
         }
 
         $current_option = '';
-        if ($this->current_rsvp) {
-            $current_option = $this->current_rsvp->getTicketTypeId();
+        if ($this->getCurrentTicket()) {
+            $current_option = $this->getCurrentTicket()->getTicketTypeId();
         }
 
         $ticket_types = $this->event->getTicketTypes();
@@ -176,7 +179,7 @@ class StanfordRSVPForm extends FormBase
 
         $form['actions']['#type'] = 'actions';
 
-        if ($this->current_rsvp) {
+        if ($this->getCurrentTicket()) {
 
             // Only show "Change RSVP" if there is an existing RSVP
 
@@ -194,7 +197,7 @@ class StanfordRSVPForm extends FormBase
             // Only show a "Cancel" button if this isn't already a cancellation
             // type of ticket type (e.g. I won't be able to attend)
 
-            if (isset($this->currentTicketType) && ($this->currentTicketType->getTicketType() != TicketType::TYPE_CANCELLATION)) {
+            if ($this->getCurrentTicketType() && ($this->getCurrentTicketType()->getTicketType() != TicketType::TYPE_CANCELLATION)) {
                 $form['actions']['cancel'] = array(
                     '#attributes' => array('class' => array('btn', 'btn-danger')),
                     '#type' => 'submit',
@@ -244,22 +247,18 @@ class StanfordRSVPForm extends FormBase
      */
     public function submitForm(array &$form, FormStateInterface $form_state)
     {
-        $user = User::load(Drupal::currentUser()->id());
-
-        $this->current_rsvp = $this->ticketLoader->loadTicket($this->event, $user);
-
         $new_option_id = $form_state->getValue('rsvp_options');
 
         // If the option selected is the same as the current RSVP, do nothing.
-        if (isset($this->current_rsvp)) {
-            if ($new_option_id == $this->current_rsvp->getTicketTypeId()) {
+        if ($this->getCurrentTicket()) {
+            if ($new_option_id == $this->getCurrentTicket()->getTicketTypeId()) {
                 Drupal::messenger()->addStatus(t('The option selected is the same as the current one. No change.'));
                 return;
             }
         }
 
         // load the ticket option
-        $new_option = $this->event->getTicketTypeById($new_option_id);
+        $new_option = $this->getEvent()->getTicketTypeById($new_option_id);
 
         // if the option chosen doesn't exist, do nothing
         if (!($new_option)) {
@@ -267,36 +266,90 @@ class StanfordRSVPForm extends FormBase
             return;
         }
 
-        // if the option chosen is a cancel option
-        if ($new_option->getTicketType() == TicketType::TYPE_CANCELLATION) {
-            $this->registrar->cancel($user, $new_option);
-            return;
-        }
-
         // Check to see if there are any spaces available for the option chosen.
 
         if ($new_option->hasSpaceAvailable()) {
-            $ticket = $this->registrar->register($user, $new_option);
-            $this->notifier->notify($user, $this->event, $ticket);
-
-            // TODO: update registration
+            $ticket = $this->registrar->register($this->getCurrentUser(), $this->event, $new_option);
+            if ($ticket) {
+                if ($new_option->getTicketType() == TicketType::TYPE_CANCELLATION) {
+                    Drupal::messenger()->addMessage(t('You&rsquo;ve cancelled with @option_name.', array('@option_name' => $new_option->getName())));
+                } else {
+                    Drupal::messenger()->addMessage(t('You&rsquo;ve been registered for @option_name.', array('@option_name' => $new_option->getName())));
+                }
+            }
         } elseif ($new_option->hasWaitlistAvailable()) {
-            $ticket = $this->registrar->waitlist($user, $new_option);
+            $ticket = $this->registrar->waitlist($this->getCurrentUser(), $this->event, $new_option);
+            if ($ticket) {
+                Drupal::messenger()->addMessage(t('You&rsquo;ve been waitlisted for @option_name.', array('@option_name' => $new_option->getName())));
+            }
         } else {
             dsm('there is no room');
             // TODO: return error message
         }
-        // update the rsvp
-        // call the webhook
-        // notify the user that they are registered
-        // else if there is a waitlist available
-        // update the rsvp
-        // notify the user that they are on the waitlist
     }
 
     public function cancel(array &$form, FormStateInterface &$form_state)
     {
-        $user = User::load(Drupal::currentUser()->id());
-        $this->registrar->delete($user, $this->currentTicketType);
+        $this->registrar->cancel($this->getCurrentUser(), $this->getEvent(), $this->getCurrentTicketType());
+    }
+
+
+    private function getEvent(): Event
+    {
+        if (isset($this->event)) {
+            return $this->event;
+        }
+        else {
+            $this->event = $this->eventLoader->getEventByNode($this->getNode());
+        }
+    }
+
+    private function getNode(): Node {
+        return $this->node;
+    }
+
+
+
+    /**
+     * @return Ticket|null
+     */
+    private function getCurrentTicket(): ?Ticket
+    {
+        if (isset($this->currentTicket)) {
+            return $this->currentTicket;
+        }
+        else {
+            $this->currentTicket = $this->ticketLoader->loadTicket($this->getEvent(), $this->getCurrentUser());
+            return $this->currentTicket;
+        }
+    }
+
+    /**
+     * @return Drupal\Core\Entity\EntityBase|Drupal\Core\Entity\EntityInterface|null
+     */
+    private function getCurrentUser() {
+        if (isset($this->currentUser)) {
+            return $this->currentUser;
+        }
+        else {
+            $this->currentUser = User::load(Drupal::currentUser()->id());
+            return $this->currentUser;
+        }
+    }
+
+    /**
+     * @return TicketType|null
+     */
+    private function getCurrentTicketType(): ?TicketType
+    {
+        return $this->currentTicketType;
+    }
+
+    /**
+     * @param TicketType|null $ticket_type
+     */
+    private function setCurrentTicketType(?TicketType $ticket_type)
+    {
+        $this->currentTicketType = $ticket_type;
     }
 }

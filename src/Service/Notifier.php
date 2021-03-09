@@ -17,7 +17,7 @@ class Notifier
      * @param Ticket $ticket
      */
     public function notify(User $user, Event $event, Ticket $ticket) {
-        Drupal::messenger()->addStatus($user->getDisplayName() . ' being notified about ' . $event->getTicketTypeById($ticket->getTicketTypeId())->getName());
+        Drupal::messenger()->addStatus($user->getDisplayName() . ' being notified about ' . $event->getTicketTypeById($ticket->getTicketTypeId())->getName() . ' with status: ' . $ticket->getStatus());
     }
 
 }
