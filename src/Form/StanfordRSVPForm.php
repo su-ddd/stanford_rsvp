@@ -269,28 +269,46 @@ class StanfordRSVPForm extends FormBase
         // Check to see if there are any spaces available for the option chosen.
 
         if ($new_option->hasSpaceAvailable()) {
-            $ticket = $this->registrar->register($this->getCurrentUser(), $this->event, $new_option);
-            if ($ticket) {
+            $result = $this->registrar->register($this->getCurrentUser(), $this->event, $new_option, $this->getCurrentTicket());
+        } elseif ($new_option->hasWaitlistAvailable()) {
+            $result = $this->registrar->waitlist($this->getCurrentUser(), $this->event, $new_option, false, $this->getCurrentTicket());
+        } else {
+            $result = Registrar::RESULT_NO_ROOM;
+        }
+
+        switch ($result) {
+            case Registrar::RESULT_REGISTERED:
                 if ($new_option->getTicketType() == TicketType::TYPE_CANCELLATION) {
                     Drupal::messenger()->addMessage(t('You&rsquo;ve cancelled with @option_name.', array('@option_name' => $new_option->getName())));
                 } else {
                     Drupal::messenger()->addMessage(t('You&rsquo;ve been registered for @option_name.', array('@option_name' => $new_option->getName())));
                 }
-            }
-        } elseif ($new_option->hasWaitlistAvailable()) {
-            $ticket = $this->registrar->waitlist($this->getCurrentUser(), $this->event, $new_option);
-            if ($ticket) {
+                break;
+            case Registrar::RESULT_WAITLISTED:
                 Drupal::messenger()->addMessage(t('You&rsquo;ve been waitlisted for @option_name.', array('@option_name' => $new_option->getName())));
-            }
-        } else {
-            dsm('there is no room');
-            // TODO: return error message
+                break;
+            case Registrar::RESULT_WAITLISTED_AFTER_REGISTRATION_FULL:
+                Drupal::messenger()->addMessage(t('We tried to register you but there was no more room. You&rsquo;ve been waitlisted for @option_name.', array('@option_name' => $new_option->getName())));
+                break;
+            case Registrar::RESULT_NO_ROOM:
+                Drupal::messenger()->addMessage(t('We tried to register or waitlist you for @option_name but there was no more room.', array('@option_name' => $new_option->getName())));
+                break;
+            default:
+                Drupal::messenger()->addMessage(t('We tried to register or waitlist you for @option_name but encountered an error.', array('@option_name' => $new_option->getName())));
         }
     }
 
     public function cancel(array &$form, FormStateInterface &$form_state)
     {
-        $this->registrar->cancel($this->getCurrentUser(), $this->getEvent(), $this->getCurrentTicketType());
+        $result = $this->registrar->cancel($this->getCurrentUser(), $this->getEvent(), $this->getCurrentTicketType(), $this->getCurrentTicket());
+
+        switch ($result) {
+            case Registrar::RESULT_CANCELLED:
+                Drupal::messenger()->addMessage(t('We&rsquo;ve cancelled your registration.'));
+                break;
+            default:
+                Drupal::messenger()->addMessage(t('We&rsquo;ve encountered an error.'));
+        }
     }
 
 

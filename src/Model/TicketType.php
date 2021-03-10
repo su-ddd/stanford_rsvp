@@ -41,16 +41,6 @@ class TicketType
     /**
      * @var Ticket[]
      */
-    private $tickets_registered;
-
-    /**
-     * @var Ticket[]
-     */
-    private $tickets_waitlisted;
-
-    /**
-     * @var Ticket[]
-     */
     private $tickets;
 
     /**
@@ -296,6 +286,7 @@ class TicketType
                     'name' => $ticket->getUser()->getDisplayName(),
                     'email' => $ticket->getUser()->getEmail(),
                     'date' => $ticket->getFormattedCreatedDate(),
+                    'user' => $ticket->getUser()
                 );
             }
         }

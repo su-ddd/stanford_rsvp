@@ -21,7 +21,11 @@ services:
     class: Drupal\stanford_rsvp\Service\Registrar
     arguments:
       - '@stanford_rsvp.event_loader'
+      - '@stanford_rsvp.ticket_type_loader'
       - '@stanford_rsvp.ticket_loader'
       - '@stanford_rsvp.notifier'
+      - '@stanford_rsvp.calendar'
   stanford_rsvp.notifier:
     class: Drupal\stanford_rsvp\Service\Notifier
+  stanford_rsvp.calendar:
+    class: Drupal\stanford_rsvp\Service\Calendar
