@@ -22,3 +22,58 @@ function stanford_rsvp_theme($existing, $type, $theme, $path): array
         ]
     ];
 }
+
+/**
+ * Implements hook_mail().
+ */
+function stanford_rsvp_mail($key, &$message, $params) {
+
+    $message['from'] = \Drupal::config('system.site')->get('mail');
+    $user = $params['user'];
+    $event = $params['event'];
+
+    switch ($key) {
+        case 'registration':
+            $message['subject'] = t("Registration Receipt for @event-name", array('@event-name' => $event->getName()));
+            $message['body'][] = t("Dear @user-name,
+                  \nYou have been registered for @event-name.
+                  \nA calendar invite will follow shortly.
+                  \nIf for some reason you are unable to attend, we ask that you kindly cancel your registration so that waitlisted registrants can be accommodated.
+                  \nTo cancel your registration, please go to the following link:
+                  \n@event-url",
+                array('@user-name' => $user->getDisplayName(), '@event-name' => $event->getName(), '@event-url' => $event->getInfoUrl()));
+            break;
+        case 'waitlist':
+            $message['subject'] = t("Waitlist Receipt for @event-name", array('@event-name' => $event->getName()));
+            $message['body'][] = t("Dear @user-name,
+                \nYou have been waitlisted for @event-name.
+                \nAs cancellations occur, those who are at the top of the waitlist will automatically be registered.
+                \nIf that's you, you will receive an email to confirm your registration.",
+                array('@user-name' => $user->getDisplayName(), '@event-name' => $event->getName()));
+            break;
+        case 'waitlisted_after_registration_full':
+            $message['subject'] = t("Waitlist Receipt for @event-name", array('@event-name' => $event->getName()));
+            $message['body'][] = t("Dear @user-name,
+                \nYou have been waitlisted for @event-name. We tried to register you, but the event filled out just before.
+                \nAs cancellations occur, those who are at the top of the waitlist will automatically be registered.
+                \nIf that's you, you will receive an email to confirm your registration.",
+                array('@user-name' => $user->getDisplayName(), '@event-name' => $event->getName()));
+            break;
+        case 'cancellation':
+            $message['subject'] = t('Cancellation Receipt for @event-name', array('@event-name' => $event->getName()));
+            $message['body'][] = t("Dear @user-name,
+                 \nAs requested, we've cancelled your registration. We are sorry we won't get to see you at the event.
+                 \nIf you received an invitation for the event, please decline the calendar invite as well.",
+                array('@user-name' => $user->getDisplayName()));
+            break;
+        case 'registration_from_waitlist':
+            $message['subject'] = t("Registration Receipt for @event-name", array('@event-name' => $event->getName()));
+            $message['body'][] = t("Dear @user-name,
+                 \nCongratulations! A spot opened up and you have been registered for @event-name.
+                 \nA calendar invite will follow shortly.
+                 \nIf for some reason you are unable to attend, we would ask that you kindly cancel your registration so that waitlisted registrants can be accommodated. To cancel your registration, please go to the following link:
+                 \n@event-url",
+                array('@user-name' => $user->getDisplayName(), '@event-name' => $event->getName(), '@event-url' => $event->getInfoUrl()));
+            break;
+    }
+}

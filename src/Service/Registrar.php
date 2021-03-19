@@ -16,10 +16,11 @@ class Registrar
 
     const RESULT_NO_ROOM = 0;
     const RESULT_REGISTERED = 1;
-    const RESULT_WAITLISTED = 2;
-    const RESULT_CANCELLED = 3;
-    const RESULT_WAITLISTED_AFTER_REGISTRATION_FULL = 4;
-    const RESULT_ERROR = 5;
+    const RESULT_REGISTERED_FROM_WAITLIST = 2;
+    const RESULT_WAITLISTED = 3;
+    const RESULT_CANCELLED = 4;
+    const RESULT_WAITLISTED_AFTER_REGISTRATION_FULL = 5;
+    const RESULT_ERROR = 6;
 
     /**
      * @var EventLoader
@@ -75,8 +76,8 @@ class Registrar
         if ($ticket_type->getTicketType() == TicketType::TYPE_CANCELLATION) {
             $ticket = $this->save($user, $ticket_type, Ticket::STATUS_REGISTERED);
             if ($ticket) {
-                $this->notifier->notify($user, $event, $ticket, Registrar::RESULT_REGISTERED);
-                return Registrar::RESULT_REGISTERED;
+                $this->notifier->notify($user, $event, $ticket, Registrar::RESULT_CANCELLED);
+                return Registrar::RESULT_CANCELLED;
             }
             else {
                 return Registrar::RESULT_ERROR;
@@ -89,7 +90,6 @@ class Registrar
             $ticket = $this->save($user, $ticket_type, Ticket::STATUS_REGISTERED);
             // If the registration was successful
             if ($ticket) {
-                // TODO: Notify User
                 $this->notifier->notify($user, $event, $ticket, Registrar::RESULT_REGISTERED);
                 // TODO: Calendar Invite
                 $this->calendar->invite($user);
